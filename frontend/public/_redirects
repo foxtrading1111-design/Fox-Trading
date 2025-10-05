@@ -1,2 +1,5 @@
-# SPA fallback for client-side routing
+# SPA fallback for client-side routing on Render
 /* /index.html 200
+
+# API proxy rules (in case needed)
+/api/* https://fox-trading-api.onrender.com/api/* 200

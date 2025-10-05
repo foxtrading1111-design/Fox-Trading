@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: fox-trading-frontend
+    runtime: static
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      # Handle API requests by proxying to backend
+      - type: rewrite
+        source: /api/*
+        destination: https://fox-trading-api.onrender.com/api/*
+      # Handle SPA routing - all other routes go to index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - source: /index.html
+        headers:
+          - key: Cache-Control
+            value: no-store, no-cache, must-revalidate
+      - source: /static/*
+        headers:
+          - key: Cache-Control
+            value: public, max-age=31536000, immutable
+    autoDeploy: false
