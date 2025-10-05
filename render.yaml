@@ -28,6 +28,11 @@ services:
       - type: rewrite  
         source: /*
         destination: /index.html
+    headers:
+      - source: /*
+        headers:
+          - key: Cache-Control
+            value: no-cache
     autoDeploy: false
 
 databases:
