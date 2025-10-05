@@ -56,14 +56,13 @@ export default function RegisterPage() {
       try {
         const response = await api<{ success: boolean; message: string; email: string; otp?: string }>('/api/auth/register/send-otp', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: {
             full_name: fullName,
             email,
             password,
             sponsor_referral_code: sponsorCode,
             position
-          })
+          }
         });
         
         setMessage(response.message);
@@ -92,8 +91,7 @@ export default function RegisterPage() {
       try {
         const response = await api<{ token: string; referral_code: string; message: string }>('/api/auth/register/verify-otp', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, otp })
+          body: { email, otp }
         });
         
         setToken(response.token);
