@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => ({
         manualChunks: undefined,
       },
     },
+    copyPublicDir: true,
   },
   publicDir: 'public',
   plugins: [
