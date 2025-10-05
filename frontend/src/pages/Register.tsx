@@ -128,7 +128,7 @@ export default function RegisterPage() {
                   <p className="mt-2 text-sm">Sponsor: <span className="font-medium">{sponsorName}</span></p>
                 )}
               </div>
-            ) : (
+            ) : step === 2 ? (
               <>
                 {sponsorName && (
                   <div className="mb-4 p-3 bg-muted rounded-lg">
