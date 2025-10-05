@@ -17,7 +17,7 @@ async function main() {
       full_name: 'Kunal Pratap Singh',
       email: mainEmail,
       password_hash: hashedMainPassword,
-      referral_code: 'PJMEDUP5',
+      referral_code: 'FOX001',
       role: 'USER',
       created_at: new Date('2025-09-19')
     },
@@ -95,9 +95,10 @@ async function main() {
   for (const walletAddr of walletAddresses) {
     await prisma.wallet_addresses.upsert({
       where: {
-        user_id_blockchain: {
+        user_id_blockchain_address: {
           user_id: walletAddr.user_id,
-          blockchain: walletAddr.blockchain
+          blockchain: walletAddr.blockchain,
+          address: walletAddr.address
         }
       },
       update: {},
@@ -221,7 +222,7 @@ async function main() {
       full_name: 'Team Member 1',
       email: 'team1@demo.com',
       password_hash: hashedMainPassword,
-      referral_code: 'TEAM001',
+      referral_code: 'FOX002',
       sponsor_id: mainUser.id,
       position: 'LEFT',
       role: 'USER',
@@ -261,7 +262,7 @@ async function main() {
       full_name: 'Team Member 2',
       email: 'team2@demo.com',
       password_hash: hashedMainPassword,
-      referral_code: 'TEAM002',
+      referral_code: 'FOX003',
       sponsor_id: mainUser.id,
       position: 'RIGHT',
       role: 'USER',
@@ -307,7 +308,7 @@ async function main() {
       full_name: 'Guest Demo',
       email: guestEmail,
       password_hash: hashedPassword,
-      referral_code: 'GUESTDEMO',
+      referral_code: 'FOX999',
       role: 'USER',
       created_at: new Date()
     },
@@ -324,9 +325,9 @@ async function main() {
   });
 
   console.log('✅ Seed complete: Test users created');
-  console.log(`   Main User - Email: ${mainEmail}, Password: ${mainPassword}`);
-  console.log(`   Guest User - Email: ${guestEmail}, Password: ${guestPassword}`);
-  console.log(`   Team members created with investments`);
+  console.log(`   Main User - Email: ${mainEmail}, Password: ${mainPassword}, Referral: FOX001`);
+  console.log(`   Guest User - Email: ${guestEmail}, Password: ${guestPassword}, Referral: FOX999`);
+  console.log(`   Team members created with investments (FOX002, FOX003)`);
   console.log(`   Crypto wallet addresses created for BTC, ETH, USDT, USDC`);
   console.log(`   Sample deposit transactions created (completed, pending, failed)`);
 }
