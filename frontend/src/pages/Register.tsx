@@ -58,7 +58,7 @@ export default function RegisterPage() {
     if (position) params.append('position', position);
     
     const isDevelopment = window.location.hostname === 'localhost';
-    const baseUrl = isDevelopment ? 'http://localhost:4000' : window.location.origin;
+    const baseUrl = isDevelopment ? 'http://localhost:4000' : 'https://fox-trading-api-2jv8.onrender.com';
     window.location.href = `${baseUrl}/api/auth/google?${params.toString()}`;
   };
 
