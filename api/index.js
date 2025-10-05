@@ -2,8 +2,6 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { json } from 'express';
-import session from 'express-session';
-import passport from 'passport';
 import { authRouter } from './src/routes/auth.js';
 import { userRouter } from './src/routes/user.js';
 import { investmentRouter } from './src/routes/investment.js';
@@ -16,7 +14,6 @@ import { rewardsRouter } from './src/routes/rewards.js';
 import { testingRouter } from './src/routes/testing.js';
 import { adminRouter } from './src/routes/admin.js';
 
-import './src/config/passport.js';
 
 const app = express();
 
@@ -34,20 +31,6 @@ app.use(cors({
 
 app.use(json());
 
-app.use(
-  session({
-    secret: process.env.JWT_SECRET || 'a_default_secret_for_session',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { 
-      secure: isProduction,
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    },
-  }),
-);
-
-app.use(passport.initialize());
-app.use(passport.session());
 
 app.get('/api/health', (_req, res) => res.json({ 
   ok: true, 
