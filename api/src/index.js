@@ -16,14 +16,10 @@ dotenv.config({ path: envPath });
 console.log('JWT_SECRET loaded:', !!process.env.JWT_SECRET);
 console.log('DATABASE_URL loaded:', !!process.env.DATABASE_URL);
 console.log('PORT loaded:', !!process.env.PORT);
-console.log('GOOGLE_CLIENT_ID loaded:', !!process.env.GOOGLE_CLIENT_ID);
-console.log('GOOGLE_CLIENT_SECRET loaded:', !!process.env.GOOGLE_CLIENT_SECRET);
 console.log('COINMARKETCAP_API_KEY loaded:', !!process.env.COINMARKETCAP_API_KEY);
 
 import cors from 'cors';
 import { json } from 'express';
-import session from 'express-session';
-import passport from 'passport';
 import { authRouter } from './routes/auth.js';
 import { userRouter } from './routes/user.js';
 import { investmentRouter } from './routes/investment.js';
@@ -36,8 +32,6 @@ import { testingRouter } from './routes/testing.js';
 import { adminRouter } from './routes/admin.js';
 import { withdrawalRouter } from './routes/withdrawal.js';
 
-// This import executes the passport configuration.
-import './config/passport.js';
 
 const app = express();
 app.use(cors());
@@ -45,17 +39,6 @@ app.use(cors());
 app.use(json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-app.use(
-  session({
-    secret: process.env.JWT_SECRET || 'a_default_secret_for_session',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === 'production' },
-  }),
-);
-
-app.use(passport.initialize());
-app.use(passport.session());
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 

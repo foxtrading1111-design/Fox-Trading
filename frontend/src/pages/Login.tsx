@@ -5,11 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 
-const GoogleIcon = () => (
-  <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
-    <path fill="currentColor" d="M488 261.8C488 403.3 381.5 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 21.2 174 55.8L373.5 119.8C340.6 89.4 297.4 70.4 248 70.4c-99.4 0-180.2 80.6-180.2 180.2s80.8 180.2 180.2 180.2c102.3 0 170.2-73.4 175.4-123.3H248v-69.6h239.2c1.2 12.8 2.8 25.8 2.8 39.4z"></path>
-  </svg>
-);
 
 export default function LoginPage() {
   const { login, loginGuest } = useAuth();
@@ -46,13 +41,6 @@ export default function LoginPage() {
     }
   }
 
-  // ✅ HANDLER FOR GOOGLE SIGN-IN
-  function handleGoogleSignIn() {
-    // Redirect to the backend endpoint to start the Google OAuth flow
-    const isDevelopment = window.location.hostname === 'localhost';
-    const baseUrl = isDevelopment ? 'http://localhost:4000' : 'https://fox-trading-api-2jv8.onrender.com';
-    window.location.href = `${baseUrl}/api/auth/google`;
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
@@ -80,21 +68,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* ✅ GOOGLE SIGN-IN BUTTON */}
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">
-                Or continue with
-              </span>
-            </div>
-          </div>
-          <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={loading}>
-            <GoogleIcon />
-            Sign in with Google
-          </Button>
           
           <div className="mt-4 grid grid-cols-2 gap-2">
             <Button variant="outline" onClick={onGuest} disabled={loading}>Guest Login</Button>

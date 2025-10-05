@@ -7,7 +7,6 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import AuthCallbackPage from "./pages/AuthCallbackPage";
 import AppLayout from "./layouts/AppLayout";
 import Dashboard from "./pages/app/Dashboard";
 import Network from "./pages/app/Network";
@@ -88,7 +87,6 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
-      <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
       {/* --- Public-Only Routes --- */}
       <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />

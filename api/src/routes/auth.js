@@ -2,7 +2,6 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
-import passport from 'passport';
 import { signJwt, requireAuth } from '../middleware/auth.js';
 import prisma from '../lib/prisma.js';
 import { generateUniqueReferralCode } from '../utils/referralCode.js';
@@ -17,7 +16,8 @@ const registerSchema = z.object({
   position: z.enum(['LEFT', 'RIGHT'])
 });
 
-authRouter.post('/register', async (req, res) => {
+// Step 1: Send OTP for registration
+authRouter.post('/register/send-otp', async (req, res) => {
   const parse = registerSchema.safeParse(req.body);
   if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
   const { full_name, email, password, sponsor_referral_code, position } = parse.data;
@@ -29,10 +29,106 @@ authRouter.post('/register', async (req, res) => {
     const sponsor = await prisma.users.findUnique({ where: { referral_code: sponsor_referral_code } });
     if (!sponsor) return res.status(400).json({ error: 'Invalid sponsor referral code' });
     
-    // Allow multiple users on the same side (LEFT or RIGHT)
-    // No position limit validation needed
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
     
-    console.log(`Registering new user ${email} under sponsor ${sponsor.email} (ID: ${sponsor.id})`);
+    // Store registration data and OTP temporarily
+    const registrationData = {
+      full_name,
+      email,
+      password,
+      sponsor_referral_code,
+      position,
+      otp,
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+    };
+    
+    otpStore.set(`register_${email}`, registrationData);
+    
+    // Send OTP via email
+    try {
+      const emailTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Email timeout')), 5000)
+      );
+      
+      await Promise.race([
+        emailService.sendOTP(email, otp, 'registration', full_name),
+        emailTimeout
+      ]);
+      
+      console.log(`✅ Registration OTP sent to ${email}`);
+      res.json({ 
+        success: true, 
+        message: 'OTP sent to your email address. Please verify to complete registration.',
+        email: email,
+        // Include OTP in development
+        ...(process.env.NODE_ENV !== 'production' && { otp })
+      });
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+      console.log(`📧 Fallback - Registration OTP for ${email}: ${otp}`);
+      
+      res.json({ 
+        success: true, 
+        message: 'OTP generated. Check console for OTP code.',
+        email: email,
+        // Always include OTP in development for easy testing
+        ...(process.env.NODE_ENV !== 'production' && { otp })
+      });
+    }
+  } catch (err) {
+    console.error('Registration OTP error:', err);
+    return res.status(500).json({ error: 'Failed to send registration OTP' });
+  }
+});
+
+// Step 2: Verify OTP and complete registration
+const verifyOtpSchema = z.object({
+  email: z.string().email(),
+  otp: z.string().min(6).max(6)
+});
+
+authRouter.post('/register/verify-otp', async (req, res) => {
+  const parse = verifyOtpSchema.safeParse(req.body);
+  if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+  const { email, otp } = parse.data;
+
+  try {
+    // Get stored registration data
+    const storedData = otpStore.get(`register_${email}`);
+    if (!storedData) {
+      return res.status(400).json({ error: 'OTP expired or invalid. Please request a new OTP.' });
+    }
+
+    // Check if OTP has expired
+    if (new Date() > storedData.expiresAt) {
+      otpStore.delete(`register_${email}`);
+      return res.status(400).json({ error: 'OTP has expired. Please request a new OTP.' });
+    }
+
+    // Verify OTP
+    if (storedData.otp !== otp) {
+      return res.status(400).json({ error: 'Invalid OTP. Please try again.' });
+    }
+
+    // OTP verified - now create the user
+    const { full_name, password, sponsor_referral_code, position } = storedData;
+    
+    // Double-check email isn't taken (race condition protection)
+    const existing = await prisma.users.findUnique({ where: { email } });
+    if (existing) {
+      otpStore.delete(`register_${email}`);
+      return res.status(409).json({ error: 'Email already registered' });
+    }
+    
+    const sponsor = await prisma.users.findUnique({ where: { referral_code: sponsor_referral_code } });
+    if (!sponsor) {
+      otpStore.delete(`register_${email}`);
+      return res.status(400).json({ error: 'Invalid sponsor referral code' });
+    }
+    
+    console.log(`Creating verified user ${email} under sponsor ${sponsor.email}`);
 
     const passwordHash = await bcrypt.hash(password, 10);
     const referralCode = await generateUniqueReferralCode();
@@ -49,14 +145,20 @@ authRouter.post('/register', async (req, res) => {
       },
     });
     
-    console.log(`Successfully created user ${newUser.email} with sponsor_id: ${newUser.sponsor_id}`);
+    // Clean up OTP data
+    otpStore.delete(`register_${email}`);
+    
+    console.log(`✅ Successfully created verified user ${newUser.email}`);
 
-    // UPDATED: Include the user's role in the JWT
     const token = signJwt({ id: newUser.id, role: newUser.role });
-    return res.status(201).json({ token, referral_code: referralCode });
+    return res.status(201).json({ 
+      token, 
+      referral_code: referralCode,
+      message: 'Registration completed successfully!' 
+    });
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Registration failed' });
+    console.error('Registration verification error:', err);
+    return res.status(500).json({ error: 'Registration verification failed' });
   }
 });
 
@@ -113,51 +215,6 @@ authRouter.get('/sponsor/:code', async (req, res) => {
   }
 });
 
-// Google OAuth Routes
-console.log('Setting up Google OAuth routes...');
-authRouter.get('/google', (req, res, next) => {
-  console.log('Google OAuth route accessed');
-  // Get referral code and position from query parameters
-  const referralCode = req.query.ref || req.query.referral_code || '';
-  const position = req.query.position || '';
-  console.log('Referral code received:', referralCode);
-  console.log('Position received:', position);
-  
-  // Pass both referral code and position as state parameter to OAuth
-  const stateData = JSON.stringify({ referralCode, position });
-  passport.authenticate('google', { 
-    scope: ['profile', 'email'],
-    state: stateData // Pass both referral code and position as state
-  })(req, res, next);
-});
-
-authRouter.get(
-  '/google/callback',
-  passport.authenticate('google', {
-    failureRedirect: getFrontendUrl() + '/login',
-    session: false,
-  }),
-  (req, res) => {
-    const user = req.user;
-    // UPDATED: Include the user's role in the JWT
-    const token = signJwt({ id: user.id, role: user.role });
-
-    res.redirect(`${getFrontendUrl()}/auth/callback?token=${token}`);
-  }
-);
-
-// Helper function to get frontend URL based on environment
-function getFrontendUrl() {
-  const isProduction = process.env.NODE_ENV === 'production';
-  
-  if (isProduction) {
-    // Try environment variables first, then fallback to actual production URL
-    return process.env.FRONTEND_URL || 
-           'https://fox-trading.onrender.com';
-  } else {
-    return 'http://localhost:8080';
-  }
-}
 
 import otpStore from '../lib/otpStore.js';
 import emailService from '../services/emailService.js';
