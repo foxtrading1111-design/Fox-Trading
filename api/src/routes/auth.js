@@ -5,6 +5,8 @@ import { nanoid } from 'nanoid';
 import { signJwt, requireAuth } from '../middleware/auth.js';
 import prisma from '../lib/prisma.js';
 import { generateUniqueReferralCode } from '../utils/referralCode.js';
+import otpStore from '../lib/otpStore.js';
+import emailService from '../services/emailService.js';
 export const authRouter = Router();
 
 // Zod schemas don't need type annotations in JS
@@ -216,8 +218,6 @@ authRouter.get('/sponsor/:code', async (req, res) => {
 });
 
 
-import otpStore from '../lib/otpStore.js';
-import emailService from '../services/emailService.js';
 
 // Generate OTP for deposit verification
 authRouter.post('/send-deposit-otp', requireAuth, async (req, res) => {
