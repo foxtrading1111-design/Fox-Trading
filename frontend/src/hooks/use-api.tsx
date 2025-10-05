@@ -5,7 +5,7 @@ import { useAuth } from './use-auth';
 const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 const API_BASE_URL = isDevelopment 
   ? '/api' // Use Vite proxy in development
-  : 'https://fox-trading-api.onrender.com/api'; // Render backend URL
+  : `${import.meta.env.VITE_API_URL}/api`; // Use environment variable for production
 
 export interface DashboardData {
   user_name: string;

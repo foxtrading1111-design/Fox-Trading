@@ -17,7 +17,7 @@ export async function api<T = unknown>(path: string, init?: { method?: string; b
   const isDevelopment = import.meta.env.DEV;
   const baseUrl = isDevelopment 
     ? '' // Use relative URLs in development (Vite proxy will handle it)
-    : window.location.origin; // Use current origin in production
+    : import.meta.env.VITE_API_URL || window.location.origin; // Use API URL from environment
     
   const fullUrl = path.startsWith('http') ? path : `${baseUrl}${path}`;
 
