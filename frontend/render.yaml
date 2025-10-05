@@ -1,8 +1,11 @@
 services:
   - type: web
     name: fox-trading-frontend
-    runtime: static
+    runtime: node
     plan: free
-    buildCommand: npm install && npm run build && cp public/_redirects dist/_redirects
-    staticPublishPath: dist
+    buildCommand: npm install && npm run build
+    startCommand: npm start
     autoDeploy: false
+    envVars:
+      - key: NODE_ENV
+        value: production
