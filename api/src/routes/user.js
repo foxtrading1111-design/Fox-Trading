@@ -614,6 +614,8 @@ userRouter.get('/deposit-history', async (req, res) => {
     const userId = req.user.id;
     const { status, limit = '50', offset = '0' } = req.query;
     
+    console.log(`📋 Deposit history request - User ID: ${userId}, Status: ${status || 'ALL'}, Limit: ${limit}, Offset: ${offset}`);
+    
     try {
         // Build where clause for deposits (type: 'credit' with income_source ending with '_deposit')
         const whereClause = {
@@ -625,6 +627,8 @@ userRouter.get('/deposit-history', async (req, res) => {
         if (status && status !== 'ALL') {
             whereClause.status = status;
         }
+        
+        console.log('🔍 Query where clause:', JSON.stringify(whereClause, null, 2));
 
         // Fetch deposit transactions from the database
         const deposits = await prisma.transactions.findMany({
@@ -643,6 +647,16 @@ userRouter.get('/deposit-history', async (req, res) => {
             take: parseInt(limit),
             skip: parseInt(offset),
         });
+        
+        console.log(`📊 Found ${deposits.length} deposit transactions`);
+        if (deposits.length > 0) {
+            console.log('Sample deposits:', deposits.slice(0, 2).map(d => ({ 
+                id: d.id, 
+                amount: d.amount, 
+                income_source: d.income_source, 
+                status: d.status 
+            })));
+        }
 
         // Transform the data to include blockchain information
         const formattedDeposits = deposits.map((deposit) => {

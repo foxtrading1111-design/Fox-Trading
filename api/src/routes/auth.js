@@ -184,30 +184,38 @@ authRouter.post('/send-deposit-otp', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'User email not found' });
     }
 
-    // Send OTP via email
+    // Send OTP via email with timeout and immediate fallback
+    console.log(`Generated OTP for ${user.email}: ${otp}`);
+    console.log(`Deposit details - Amount: $${amount}, Blockchain: ${blockchain}`);
+    
+    // Try to send email with a short timeout
+    let emailSent = false;
     try {
-      await emailService.sendOTP(user.email, otp, 'deposit', user.full_name);
-      console.log(`OTP email sent to ${user.email} for deposit verification`);
+      const emailTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Email timeout')), 5000) // 5 second timeout
+      );
       
-      res.json({ 
-        success: true, 
-        message: 'OTP sent to your registered email address',
-        // In development, include OTP in response for testing
-        ...(process.env.NODE_ENV !== 'production' && { otp })
-      });
+      await Promise.race([
+        emailService.sendOTP(user.email, otp, 'deposit', user.full_name),
+        emailTimeout
+      ]);
+      
+      emailSent = true;
+      console.log(`✅ OTP email sent successfully to ${user.email}`);
     } catch (emailError) {
-      console.error('Email sending failed:', emailError);
-      // Fallback to console log if email fails
-      console.log(`Fallback - OTP for ${user.email}: ${otp}`);
-      console.log(`Deposit details - Amount: $${amount}, Blockchain: ${blockchain}`);
-      
-      res.json({ 
-        success: true, 
-        message: 'OTP generated (Email service temporarily unavailable - check console)',
-        // In development, include OTP in response for testing
-        ...(process.env.NODE_ENV !== 'production' && { otp })
-      });
+      console.error('Email sending failed or timed out:', emailError);
+      console.log(`📧 Fallback - OTP for ${user.email}: ${otp}`);
     }
+    
+    // Always respond successfully (email is backup, console is primary for development)
+    res.json({ 
+      success: true, 
+      message: emailSent 
+        ? 'OTP sent to your registered email address'
+        : 'OTP generated successfully. Check console for OTP code.',
+      // Always include OTP in development for easy testing
+      ...(process.env.NODE_ENV !== 'production' && { otp, email_sent: emailSent })
+    });
   } catch (error) {
     console.error('OTP generation error:', error);
     res.status(500).json({ error: 'Failed to send OTP' });
