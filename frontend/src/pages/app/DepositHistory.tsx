@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Calendar, Wallet, TrendingUp, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { api } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface DepositTransaction {
@@ -34,23 +35,11 @@ const DepositHistory: React.FC = () => {
     
     setIsLoading(true);
     try {
-      const response = await fetch('/api/user/deposit-history', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setDeposits(data.deposits || []);
-      } else {
-        console.error('Failed to fetch deposit history');
-        toast.error('Failed to load deposit history');
-      }
+      const data = await api<{ deposits: DepositTransaction[] }>('/api/user/deposit-history');
+      setDeposits(data.deposits || []);
     } catch (error) {
       console.error('Error fetching deposit history:', error);
-      toast.error('Error loading deposit history');
+      toast.error('Failed to load deposit history');
     } finally {
       setIsLoading(false);
     }
