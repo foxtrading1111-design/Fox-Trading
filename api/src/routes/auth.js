@@ -18,13 +18,50 @@ const registerSchema = z.object({
   position: z.enum(['LEFT', 'RIGHT'])
 });
 
+// Debug test endpoint
+authRouter.post('/test-otp', async (req, res) => {
+  try {
+    console.log('Test OTP endpoint called');
+    const otp = '123456';
+    console.log('OTP Store available:', !!otpStore);
+    console.log('Email Service available:', !!emailService);
+    
+    // Test storing in OTP store
+    otpStore.set('test_user', { otp, createdAt: new Date() });
+    const stored = otpStore.get('test_user');
+    console.log('OTP Storage test:', !!stored);
+    
+    res.json({
+      success: true,
+      message: 'Test endpoint working',
+      otpStoreAvailable: !!otpStore,
+      emailServiceAvailable: !!emailService,
+      storageTest: !!stored
+    });
+  } catch (error) {
+    console.error('Test endpoint error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Step 1: Send OTP for registration
 authRouter.post('/register/send-otp', async (req, res) => {
+  console.log('Registration OTP endpoint called with body:', req.body);
+  
   const parse = registerSchema.safeParse(req.body);
-  if (!parse.success) return res.status(400).json({ error: parse.error.flatten() });
+  if (!parse.success) {
+    console.log('Validation error:', parse.error.flatten());
+    return res.status(400).json({ error: parse.error.flatten() });
+  }
   const { full_name, email, password, sponsor_referral_code, position } = parse.data;
+  console.log('Parsed data:', { full_name, email, sponsor_referral_code, position });
 
   try {
+    console.log('Checking dependencies:', {
+      otpStore: !!otpStore,
+      emailService: !!emailService,
+      prisma: !!prisma
+    });
     const existing = await prisma.users.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'Email already registered' });
     
