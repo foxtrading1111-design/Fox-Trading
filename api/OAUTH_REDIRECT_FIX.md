@@ -25,9 +25,9 @@ BACKEND_URL=https://fox-trading-api-2jv8.onrender.com
 NODE_ENV=production
 ```
 
-### 3. **Current URLs**
+### 3. **Current URLs (Confirmed)**
 - **Backend**: `https://fox-trading-api-2jv8.onrender.com`
-- **Frontend**: `https://fox-trading.onrender.com` (update with actual URL)
+- **Frontend**: `https://fox-trading.onrender.com`
 
 ### 4. **Test the Fix**
 1. Deploy the updated code

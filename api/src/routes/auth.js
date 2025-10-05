@@ -151,9 +151,8 @@ function getFrontendUrl() {
   const isProduction = process.env.NODE_ENV === 'production';
   
   if (isProduction) {
-    // Try environment variables first, then fallback to known production URLs
+    // Try environment variables first, then fallback to actual production URL
     return process.env.FRONTEND_URL || 
-           process.env.RENDER_EXTERNAL_URL || 
            'https://fox-trading.onrender.com';
   } else {
     return 'http://localhost:8080';
