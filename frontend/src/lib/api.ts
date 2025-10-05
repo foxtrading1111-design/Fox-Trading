@@ -17,7 +17,7 @@ export async function api<T = unknown>(path: string, init?: { method?: string; b
   const isDevelopment = import.meta.env.DEV;
   const baseUrl = isDevelopment 
     ? '' // Use relative URLs in development (Vite proxy will handle it)
-    : import.meta.env.VITE_API_URL || 'https://fox-trading-api.onrender.com'; // Use API URL from environment or fallback
+    : import.meta.env.VITE_API_URL || 'https://fox-trading-api-2jv8.onrender.com'; // Use API URL from environment or fallback
     
   const fullUrl = path.startsWith('http') ? path : `${baseUrl}${path}`;
 
