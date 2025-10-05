@@ -15,9 +15,15 @@ export async function api<T = unknown>(path: string, init?: { method?: string; b
 
   // Determine the base URL based on environment
   const isDevelopment = import.meta.env.DEV;
-  const baseUrl = isDevelopment 
-    ? '' // Use relative URLs in development (Vite proxy will handle it)
-    : import.meta.env.VITE_API_URL || 'https://fox-trading-api-2jv8.onrender.com'; // Use API URL from environment or fallback
+  let baseUrl;
+  
+  if (isDevelopment) {
+    baseUrl = ''; // Use relative URLs in development (Vite proxy will handle it)
+  } else {
+    // Production: Use environment variable or explicit fallback
+    baseUrl = import.meta.env.VITE_API_URL || 'https://fox-trading-api-2jv8.onrender.com';
+    console.log('Production API URL:', baseUrl); // Debug log
+  }
     
   const fullUrl = path.startsWith('http') ? path : `${baseUrl}${path}`;
 
