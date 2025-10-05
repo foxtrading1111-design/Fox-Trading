@@ -23,8 +23,8 @@ const CryptoDeposit: React.FC = () => {
     
     setIsLoading(true);
     try {
-      const data = await api<{ addresses: WalletAddress[] }>('/api/wallet/addresses');
-      setWalletAddresses(data.addresses || []);
+      const data = await api<{ walletAddresses: WalletAddress[] }>('/api/user/wallet-addresses');
+      setWalletAddresses(data.walletAddresses || []);
     } catch (error) {
       console.error('Error fetching wallet addresses:', error);
       toast.error('Failed to load wallet addresses');
