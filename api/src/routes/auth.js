@@ -134,7 +134,7 @@ authRouter.get('/google', (req, res, next) => {
 authRouter.get(
   '/google/callback',
   passport.authenticate('google', {
-    failureRedirect: 'http://localhost:8080/login',
+    failureRedirect: getFrontendUrl() + '/login',
     session: false,
   }),
   (req, res) => {
@@ -142,9 +142,23 @@ authRouter.get(
     // UPDATED: Include the user's role in the JWT
     const token = signJwt({ id: user.id, role: user.role });
 
-    res.redirect(`http://localhost:8080/auth/callback?token=${token}`);
+    res.redirect(`${getFrontendUrl()}/auth/callback?token=${token}`);
   }
 );
+
+// Helper function to get frontend URL based on environment
+function getFrontendUrl() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  if (isProduction) {
+    // Try environment variables first, then fallback to known production URLs
+    return process.env.FRONTEND_URL || 
+           process.env.RENDER_EXTERNAL_URL || 
+           'https://fox-trading.onrender.com';
+  } else {
+    return 'http://localhost:8080';
+  }
+}
 
 import otpStore from '../lib/otpStore.js';
 import emailService from '../services/emailService.js';

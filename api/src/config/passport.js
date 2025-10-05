@@ -9,15 +9,28 @@ console.log('Google OAuth Environment Variables:');
 console.log('GOOGLE_CLIENT_ID loaded:', !!process.env.GOOGLE_CLIENT_ID);
 console.log('GOOGLE_CLIENT_SECRET loaded:', !!process.env.GOOGLE_CLIENT_SECRET);
 
+// Helper function to get backend callback URL
+function getBackendCallbackURL() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  if (isProduction) {
+    // For production, use the actual backend API URL
+    const backendUrl = process.env.BACKEND_URL || 
+                      process.env.RENDER_EXTERNAL_URL || 
+                      'https://fox-trading-api-2jv8.onrender.com';
+    return `${backendUrl}/api/auth/google/callback`;
+  } else {
+    return 'http://localhost:4000/api/auth/google/callback';
+  }
+}
+
 // Only configure Google OAuth if environment variables are present
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   console.log('Configuring Google OAuth strategy...');
   passport.use(new GoogleStrategy({
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.NODE_ENV === 'production' 
-        ? `${process.env.RENDER_EXTERNAL_URL || process.env.FRONTEND_URL}/api/auth/google/callback`
-        : 'http://localhost:4000/api/auth/google/callback',
+      callbackURL: getBackendCallbackURL(),
       scope: ['profile', 'email'],
       passReqToCallback: true // Enable access to the request object
   },
