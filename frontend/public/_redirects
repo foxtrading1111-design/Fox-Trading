@@ -1,5 +1,11 @@
-# SPA fallback for client-side routing on Render
-/* /index.html 200
+# Frontend SPA Routing Rules for Render.com
+# Handle all routes by serving index.html for client-side routing
 
-# API proxy rules (in case needed)
-/api/* https://fox-trading-api.onrender.com/api/* 200
+# Serve static files directly
+/assets/*  /assets/:splat  200
+/favicon.ico  /favicon.ico  200
+/robots.txt  /robots.txt  200
+/manifest.json  /manifest.json  200
+
+# SPA fallback - serve index.html for all other routes
+/*  /index.html  200

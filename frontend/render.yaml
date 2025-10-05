@@ -9,7 +9,7 @@ services:
       # Handle API requests by proxying to backend
       - type: rewrite
         source: /api/*
-        destination: https://fox-trading-api.onrender.com/api/*
+        destination: https://fox-trading-api-2jv8.onrender.com/api/*
       # Handle SPA routing - all other routes go to index.html
       - type: rewrite
         source: /*
