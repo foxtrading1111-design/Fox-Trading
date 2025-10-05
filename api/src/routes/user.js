@@ -615,10 +615,11 @@ userRouter.get('/deposit-history', async (req, res) => {
     const { status, limit = '50', offset = '0' } = req.query;
     
     try {
-        // Build where clause
+        // Build where clause for deposits (type: 'credit' with income_source ending with '_deposit')
         const whereClause = {
             user_id: userId,
-            type: 'DEPOSIT',
+            type: 'credit',
+            income_source: { endsWith: '_deposit' }
         };
 
         if (status && status !== 'ALL') {
@@ -645,13 +646,21 @@ userRouter.get('/deposit-history', async (req, res) => {
 
         // Transform the data to include blockchain information
         const formattedDeposits = deposits.map((deposit) => {
-            // Extract blockchain info from description or default to BTC
-            let blockchain = 'BTC';
+            // Extract blockchain info from income_source - only BEP20/TRC20 supported
+            let blockchain = 'BEP20'; // Default to BEP20
             let txHash = null;
             
+            if (deposit.income_source) {
+                // Extract blockchain from income_source (remove '_deposit' suffix)
+                const blockchainFromSource = deposit.income_source.replace('_deposit', '').toUpperCase();
+                if (['BEP20', 'TRC20'].includes(blockchainFromSource)) {
+                    blockchain = blockchainFromSource;
+                }
+            }
+            
             if (deposit.description) {
-                // Try to extract blockchain from description - Updated for BEP20/TRC20
-                const blockchainMatch = deposit.description.match(/\b(BEP20|TRC20|BTC|ETH|USDT|USDC|BNB)\b/i);
+                // Try to extract blockchain from description - only BEP20/TRC20 supported
+                const blockchainMatch = deposit.description.match(/\b(BEP20|TRC20)\b/i);
                 if (blockchainMatch) {
                     blockchain = blockchainMatch[1].toUpperCase();
                 }
@@ -661,12 +670,6 @@ userRouter.get('/deposit-history', async (req, res) => {
                 if (txHashMatch) {
                     txHash = txHashMatch[1];
                 }
-            }
-            
-            // Use income_source as blockchain if it matches valid blockchains
-            const validBlockchains = ['BEP20', 'TRC20', 'BTC', 'ETH', 'USDT', 'USDC', 'BNB'];
-            if (validBlockchains.includes(deposit.income_source)) {
-                blockchain = deposit.income_source;
             }
 
             return {
