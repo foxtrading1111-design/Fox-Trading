@@ -5,6 +5,7 @@ import { Wallet, CreditCard, Shield, Clock } from 'lucide-react';
 import CryptoDepositDialog from '@/components/CryptoDepositDialog';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
+import { api } from '@/lib/api';
 
 interface WalletAddress {
   blockchain: string;
@@ -22,23 +23,11 @@ const CryptoDeposit: React.FC = () => {
     
     setIsLoading(true);
     try {
-      const response = await fetch('/api/user/wallet-addresses', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setWalletAddresses(data.walletAddresses || []);
-      } else {
-        console.error('Failed to fetch wallet addresses');
-        toast.error('Failed to load wallet addresses');
-      }
+      const data = await api<{ addresses: WalletAddress[] }>('/api/wallet/addresses');
+      setWalletAddresses(data.addresses || []);
     } catch (error) {
       console.error('Error fetching wallet addresses:', error);
-      toast.error('Error loading wallet addresses');
+      toast.error('Failed to load wallet addresses');
     } finally {
       setIsLoading(false);
     }
