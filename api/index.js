@@ -63,7 +63,8 @@ const port = Number(process.env.PORT || 4000);
 function start() {
   app.listen(port, () => {
     scheduleCommissionJobs();
-    console.log(`Server listening on http://localhost:${port}`);
+    const publicUrl = process.env.RENDER_EXTERNAL_URL || frontendUrl || `http://localhost:${port}`;
+    console.log(`Server listening at: ${publicUrl}`);
   });
 }
 

@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './use-auth';
 
 // Determine API base URL based on environment
-const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-const API_BASE_URL = isDevelopment 
+const isDevelopment = import.meta.env.DEV;
+const API_BASE_URL = isDevelopment
   ? '/api' // Use Vite proxy in development
   : `${import.meta.env.VITE_API_URL}/api`; // Use environment variable for production
 
