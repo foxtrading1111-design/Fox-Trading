@@ -15,7 +15,26 @@ class EmailService {
   initializeTransporter() {
     const emailService = process.env.EMAIL_SERVICE || 'gmail';
     
-    if (emailService === 'gmail') {
+    if (emailService === 'sendgrid') {
+      // Twilio SendGrid via SMTP
+      this.transporter = nodemailer.createTransport({
+        host: 'smtp.sendgrid.net',
+        port: 587,
+        secure: false,        // STARTTLS
+        requireTLS: true,
+        auth: {
+          user: 'apikey',     // literal username for SendGrid SMTP
+          pass: process.env.SENDGRID_API_KEY,
+        },
+        connectionTimeout: Number(process.env.EMAIL_CONNECTION_TIMEOUT || 30000),
+        greetingTimeout: Number(process.env.EMAIL_GREETING_TIMEOUT || 15000),
+        socketTimeout: Number(process.env.EMAIL_SOCKET_TIMEOUT || 30000),
+        tls: { minVersion: 'TLSv1.2', rejectUnauthorized: false },
+        pool: true,
+        maxConnections: 3,
+        maxMessages: 100,
+      });
+    } else if (emailService === 'gmail') {
       // Gmail SMTP configuration
       // Prefer STARTTLS on port 587 to avoid issues with port 465 on some hosts
       const host = 'smtp.gmail.com';
