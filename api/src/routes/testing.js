@@ -5,7 +5,29 @@ import {
   runMonthlySalary
 } from '../jobs/workers.js';
 
+import emailService from '../services/emailService.js';
 export const testingRouter = Router();
+
+// Send a test email (POST /api/testing/send-email)
+// Body: { to: string, subject?: string, text?: string }
+// For safety, only allow in non-production environments
+// You can temporarily enable in production by setting ALLOW_TEST_EMAIL=true
+
+testingRouter.post('/send-email', async (req, res) => {
+  try {
+    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_TEST_EMAIL !== 'true') {
+      return res.status(403).json({ error: 'Disabled in production' });
+    }
+    const { to, subject = 'Fox Trading Test Email', text = 'This is a test email from Fox Trading backend.' } = req.body || {};
+    if (!to) return res.status(400).json({ error: 'Missing "to" address' });
+
+    const result = await emailService.sendEmail(to, subject, `<pre>${text}</pre>`);
+    return res.json({ success: true, transporter: process.env.EMAIL_SERVICE || 'gmail', result });
+  } catch (err) {
+    console.error('Test email failed:', err);
+    return res.status(500).json({ error: err?.message || 'Test email failed' });
+  }
+});
 
 // This endpoint will run the trading bonus calculation for all users.
 testingRouter.post('/run-trading-bonus', async (_req, res) => {

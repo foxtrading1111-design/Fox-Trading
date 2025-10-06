@@ -5,6 +5,8 @@ class EmailService {
     // Initialize email transporter
     this.transporter = null;
     this.initializeTransporter();
+    // Optional: verify transporter on boot for diagnostics (non-fatal)
+    this.verifyTransporter();
   }
 
   /**
@@ -118,6 +120,19 @@ class EmailService {
       }
       
       throw error;
+    }
+  }
+  
+  /**
+   * Verify transporter connectivity (logs only)
+   */
+  async verifyTransporter() {
+    try {
+      if (!this.transporter) return;
+      const info = await this.transporter.verify();
+      console.log('Email transporter verified:', info === true ? 'OK' : info);
+    } catch (e) {
+      console.warn('Email transporter verification failed:', e?.message || e);
     }
   }
   

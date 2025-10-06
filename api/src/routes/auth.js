@@ -299,7 +299,7 @@ authRouter.post('/send-deposit-otp', requireAuth, async (req, res) => {
     let emailSent = false;
     try {
       const emailTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Email timeout')), 5000) // 5 second timeout
+        setTimeout(() => reject(new Error('Email timeout')), 15000) // 15 second timeout to accommodate SMTP latency
       );
       
       await Promise.race([
