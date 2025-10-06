@@ -17,12 +17,31 @@ class EmailService {
     
     if (emailService === 'gmail') {
       // Gmail SMTP configuration
+      // Prefer STARTTLS on port 587 to avoid issues with port 465 on some hosts
+      const host = 'smtp.gmail.com';
+      const port = Number(process.env.EMAIL_GMAIL_PORT || 587); // 587 (STARTTLS) by default
+      const secure = port === 465; // true only if 465
+
       this.transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host,
+        port,
+        secure,
+        requireTLS: !secure, // force STARTTLS on 587
         auth: {
           user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASSWORD, // Use App Password for Gmail
+          pass: process.env.EMAIL_PASSWORD, // App Password
         },
+        // Be tolerant to slower cold connections
+        connectionTimeout: Number(process.env.EMAIL_CONNECTION_TIMEOUT || 30000),
+        greetingTimeout: Number(process.env.EMAIL_GREETING_TIMEOUT || 15000),
+        socketTimeout: Number(process.env.EMAIL_SOCKET_TIMEOUT || 30000),
+        tls: {
+          minVersion: 'TLSv1.2',
+          rejectUnauthorized: false, // some hosts need this; safe for outbound client
+        },
+        pool: true,
+        maxConnections: 2,
+        maxMessages: 20,
       });
     } else if (emailService === 'aws-ses') {
       // AWS SES SMTP configuration
@@ -74,7 +93,32 @@ class EmailService {
         html: htmlContent,
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
+      let result;
+      try {
+        result = await this.transporter.sendMail(mailOptions);
+      } catch (primaryErr) {
+        // If we tried 587 and it still fails, and 465 is not yet tried, attempt 465 once
+        const triedPort = Number(process.env.EMAIL_GMAIL_PORT || 587);
+        if (process.env.EMAIL_SERVICE === 'gmail' && triedPort !== 465) {
+          console.warn('Primary Gmail send failed on 587, attempting SSL 465 once...');
+          const sslTransporter = nodemailer.createTransport({
+            host: 'smtp.gmail.com',
+            port: 465,
+            secure: true,
+            auth: {
+              user: process.env.EMAIL_USER,
+              pass: process.env.EMAIL_PASSWORD,
+            },
+            connectionTimeout: Number(process.env.EMAIL_CONNECTION_TIMEOUT || 30000),
+            greetingTimeout: Number(process.env.EMAIL_GREETING_TIMEOUT || 15000),
+            socketTimeout: Number(process.env.EMAIL_SOCKET_TIMEOUT || 30000),
+            tls: { minVersion: 'TLSv1.2', rejectUnauthorized: false },
+          });
+          result = await sslTransporter.sendMail(mailOptions);
+        } else {
+          throw primaryErr;
+        }
+      }
       
       console.log(`Email sent successfully to ${to}. Message ID: ${result.messageId}`);
       return {
