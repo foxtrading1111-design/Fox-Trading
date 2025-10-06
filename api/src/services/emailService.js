@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 
 class EmailService {
   constructor() {
@@ -14,6 +15,17 @@ class EmailService {
    */
   initializeTransporter() {
     const emailService = process.env.EMAIL_SERVICE || 'gmail';
+
+    if (emailService === 'sendgrid_api') {
+      // Twilio SendGrid Mail API (HTTP). No SMTP sockets; most reliable on PaaS.
+      if (!process.env.SENDGRID_API_KEY) {
+        console.warn('SENDGRID_API_KEY not set; sendgrid_api cannot send emails');
+      } else {
+        sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+      }
+      this.transporter = null; // not used in API mode
+      return;
+    }
     
     if (emailService === 'sendgrid') {
       // Twilio SendGrid via SMTP
@@ -105,29 +117,37 @@ class EmailService {
         throw new Error('Invalid email address format');
       }
 
-      const mailOptions = {
-        from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-        to: to,
-        subject: subject,
-        html: htmlContent,
-      };
+      const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+      const svc = process.env.EMAIL_SERVICE || 'gmail';
+
+      // SendGrid Mail API path (no SMTP sockets)
+      if (svc === 'sendgrid_api') {
+        if (!process.env.SENDGRID_API_KEY) {
+          throw new Error('SENDGRID_API_KEY not set');
+        }
+        const msg = { to, from, subject, html: htmlContent };
+        const [resp] = await sgMail.send(msg);
+        const msgId = resp.headers?.['x-message-id'] || resp.headers?.['x-message-id'] || undefined;
+        console.log(`Email sent via SendGrid API to ${to}. Status: ${resp.statusCode}`);
+        return { success: true, messageId: msgId, status: resp.statusCode };
+      }
+
+      // Nodemailer SMTP path
+      const mailOptions = { from, to, subject, html: htmlContent };
 
       let result;
       try {
         result = await this.transporter.sendMail(mailOptions);
       } catch (primaryErr) {
-        // If we tried 587 and it still fails, and 465 is not yet tried, attempt 465 once
+        // If we tried 587 and it still fails, and 465 is not yet tried, attempt 465 once (Gmail-only)
         const triedPort = Number(process.env.EMAIL_GMAIL_PORT || 587);
-        if (process.env.EMAIL_SERVICE === 'gmail' && triedPort !== 465) {
+        if (svc === 'gmail' && triedPort !== 465) {
           console.warn('Primary Gmail send failed on 587, attempting SSL 465 once...');
           const sslTransporter = nodemailer.createTransport({
             host: 'smtp.gmail.com',
             port: 465,
             secure: true,
-            auth: {
-              user: process.env.EMAIL_USER,
-              pass: process.env.EMAIL_PASSWORD,
-            },
+            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASSWORD },
             connectionTimeout: Number(process.env.EMAIL_CONNECTION_TIMEOUT || 30000),
             greetingTimeout: Number(process.env.EMAIL_GREETING_TIMEOUT || 15000),
             socketTimeout: Number(process.env.EMAIL_SOCKET_TIMEOUT || 30000),
@@ -140,11 +160,7 @@ class EmailService {
       }
       
       console.log(`Email sent successfully to ${to}. Message ID: ${result.messageId}`);
-      return {
-        success: true,
-        messageId: result.messageId,
-        message: 'Email sent successfully'
-      };
+      return { success: true, messageId: result.messageId, message: 'Email sent successfully' };
     } catch (error) {
       console.error('Email sending failed:', error);
       throw new Error(`Email sending failed: ${error.message}`);
@@ -191,7 +207,7 @@ class EmailService {
    */
   async verifyTransporter() {
     try {
-      if (!this.transporter) return;
+      if (!this.transporter) return; // sendgrid_api mode skips SMTP verification
       const info = await this.transporter.verify();
       console.log('Email transporter verified:', info === true ? 'OK' : info);
     } catch (e) {
