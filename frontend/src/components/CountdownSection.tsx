@@ -3,18 +3,23 @@ import { Button } from '@/components/ui/button';
 import { ShoppingCart } from 'lucide-react';
 
 const CountdownSection = () => {
-  const [timeLeft, setTimeLeft] = useState({
-    days: 2437,
-    hours: 15,
-    minutes: 8,
-    seconds: 23
-  });
+  // Initialize with 240 days and randomized smaller units
+  const [timeLeft, setTimeLeft] = useState(() => ({
+    days: 240,
+    hours: Math.floor(Math.random() * 24),
+    minutes: Math.floor(Math.random() * 60),
+    seconds: Math.floor(Math.random() * 60),
+  }));
 
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         let { days, hours, minutes, seconds } = prev;
-        
+
+        if (days === 0 && hours === 0 && minutes === 0 && seconds === 0) {
+          return prev; // stop at zero
+        }
+
         if (seconds > 0) {
           seconds--;
         } else if (minutes > 0) {
@@ -65,7 +70,7 @@ const CountdownSection = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
             <div className="bg-gold rounded-2xl p-8 text-center shadow-gold-glow">
               <div className="text-4xl md:text-5xl font-bold text-navy mb-2">
-                -{timeLeft.days}
+                {timeLeft.days}
               </div>
               <div className="border-t-2 border-navy pt-2">
                 <div className="text-navy font-semibold uppercase text-sm tracking-wide">DAYS</div>
@@ -74,7 +79,7 @@ const CountdownSection = () => {
 
             <div className="bg-gold rounded-2xl p-8 text-center shadow-gold-glow">
               <div className="text-4xl md:text-5xl font-bold text-navy mb-2">
-                -{timeLeft.hours}
+                {timeLeft.hours}
               </div>
               <div className="border-t-2 border-navy pt-2">
                 <div className="text-navy font-semibold uppercase text-sm tracking-wide">HOURS</div>
@@ -83,7 +88,7 @@ const CountdownSection = () => {
 
             <div className="bg-gold rounded-2xl p-8 text-center shadow-gold-glow">
               <div className="text-4xl md:text-5xl font-bold text-navy mb-2">
-                -{timeLeft.minutes}
+                {timeLeft.minutes}
               </div>
               <div className="border-t-2 border-navy pt-2">
                 <div className="text-navy font-semibold uppercase text-sm tracking-wide">MINUTES</div>
@@ -92,7 +97,7 @@ const CountdownSection = () => {
 
             <div className="bg-gold rounded-2xl p-8 text-center shadow-gold-glow">
               <div className="text-4xl md:text-5xl font-bold text-navy mb-2">
-                -{timeLeft.seconds}
+                {timeLeft.seconds}
               </div>
               <div className="border-t-2 border-navy pt-2">
                 <div className="text-navy font-semibold uppercase text-sm tracking-wide">SECONDS</div>
