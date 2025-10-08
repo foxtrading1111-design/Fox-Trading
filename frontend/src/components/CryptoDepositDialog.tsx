@@ -559,19 +559,19 @@ const CryptoDepositDialog: React.FC<CryptoDepositDialogProps> = ({
                   Your deposit request has been sent to our admin team for review. You'll receive an email notification once it's processed.
                 </p>
               </div>
-              <div className="bg-gray-50 rounded-lg p-4 text-left">
-                <h4 className="font-medium mb-2">Deposit Details:</h4>
-                <div className="text-sm space-y-1">
+              <div className="bg-white rounded-lg p-4 text-left border border-gray-200">
+                <h4 className="font-medium mb-2 text-black">Deposit Details:</h4>
+                <div className="text-sm space-y-1 text-black">
                   <div className="flex justify-between">
-                    <span>Amount:</span>
-                    <span className="font-medium">${depositAmount}</span>
+                    <span className="text-black">Amount:</span>
+                    <span className="font-medium text-black">${depositAmount}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Network:</span>
-                    <span className="font-medium">{selectedBlockchain}</span>
+                    <span className="text-black">Network:</span>
+                    <span className="font-medium text-black">{selectedBlockchain}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Status:</span>
+                    <span className="text-black">Status:</span>
                     <span className="text-yellow-600 font-medium">Pending Review</span>
                   </div>
                 </div>
