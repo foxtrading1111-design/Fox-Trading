@@ -22,12 +22,27 @@ const isProduction = process.env.NODE_ENV === 'production';
 const frontendUrl = process.env.FRONTEND_URL || 
   (isProduction ? process.env.RENDER_EXTERNAL_URL : 'http://localhost:8080');
 
-app.use(cors({
-  origin: isProduction ? 
-    [frontendUrl, process.env.RENDER_EXTERNAL_URL, 'https://fox-trading-frontend.onrender.com'].filter(Boolean) : 
-    ['http://localhost:8080', 'http://localhost:3000'],
-  credentials: true
-}));
+// CORS with configurable allowlist
+const extraOrigins = (process.env.FRONTEND_EXTRA_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const allowlist = isProduction
+  ? [frontendUrl, process.env.RENDER_EXTERNAL_URL, 'https://fox-trading-frontend.onrender.com', ...extraOrigins].filter(Boolean)
+  : ['http://localhost:8080', 'http://localhost:3000'];
+
+const corsOptions = {
+  credentials: true,
+  origin: (origin, cb) => {
+    // Allow server-to-server or curl (no origin)
+    if (!isProduction || !origin) return cb(null, true);
+    if (allowlist.includes(origin)) return cb(null, true);
+    return cb(new Error(`Not allowed by CORS: ${origin}`));
+  },
+};
+app.use(cors(corsOptions));
+// Preflight
+app.options('*', cors(corsOptions));
 
 // Increase payload limit for JSON and URL-encoded bodies (e.g., receipt screenshots)
 const bodyLimit = process.env.BODY_LIMIT || '5mb';
