@@ -29,7 +29,10 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(json());
+// Increase payload limit for JSON and URL-encoded bodies (e.g., receipt screenshots)
+const bodyLimit = process.env.BODY_LIMIT || '5mb';
+app.use(json({ limit: bodyLimit }));
+app.use(express.urlencoded({ limit: bodyLimit, extended: true }));
 
 
 app.get('/api/health', (_req, res) => res.json({ 
