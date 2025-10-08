@@ -61,7 +61,7 @@ export default function LoginPage() {
             {error && <p className="text-destructive text-sm">{error}</p>}
             <button 
               type="submit"
-              className="w-full h-10 px-4 py-2 bg-accent text-black font-medium rounded-md hover:shadow-gold-glow hover:bg-accent/90 disabled:opacity-50 disabled:pointer-events-none transition-colors" 
+              className="w-full h-10 px-4 py-2 bg-gold text-navy font-medium rounded-md hover:bg-gold/90 hover:shadow-gold-glow disabled:opacity-50 disabled:pointer-events-none transition-colors" 
               disabled={loading}
             >
               {loading ? 'Signing in...' : 'Sign in'}
@@ -71,7 +71,7 @@ export default function LoginPage() {
           
           <div className="mt-4 grid grid-cols-2 gap-2">
             <Button variant="outline" onClick={onGuest} disabled={loading}>Guest Login</Button>
-            <Link to="/register" className="inline-flex items-center justify-center text-sm font-medium text-accent hover:underline">Create an account</Link>
+            <Link to="/register" className="inline-flex items-center justify-center text-sm font-medium rounded-md px-4 py-2 bg-gold text-navy hover:bg-gold/90 text-center">Create an account</Link>
           </div>
         </CardContent>
       </Card>
