@@ -37,8 +37,12 @@ const corsOptions = {
     // Allow server-to-server or curl (no origin)
     if (!isProduction || !origin) return cb(null, true);
     if (allowlist.includes(origin)) return cb(null, true);
-    return cb(new Error(`Not allowed by CORS: ${origin}`));
+    // Deny without throwing (avoid 500 on preflight).
+    return cb(null, false);
   },
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  optionsSuccessStatus: 204,
 };
 app.use(cors(corsOptions));
 // Preflight
