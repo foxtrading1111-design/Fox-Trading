@@ -78,12 +78,50 @@ withdrawalRouter.post('/income', async (req, res) => {
       });
     }
     const result = await prisma.$transaction(async (prisma) => {
-      // Get user's wallet with lock
+      // Calculate withdrawable balance (only from unlocked income)
+      const withdrawableTransactions = await prisma.transactions.aggregate({
+        _sum: { amount: true },
+        where: {
+          user_id: userId,
+          type: 'credit',
+          unlock_date: { lte: new Date() }, // Only unlocked transactions
+          OR: [
+            { income_source: 'direct_income' },
+            { income_source: 'team_income' },
+            { income_source: 'salary_income' },
+            { income_source: 'monthly_profit' },
+            { income_source: { contains: 'income' } }
+          ],
+          status: 'COMPLETED'
+        }
+      });
+
+      // Get already withdrawn amounts
+      const totalWithdrawn = await prisma.transactions.aggregate({
+        _sum: { amount: true },
+        where: {
+          user_id: userId,
+          type: 'debit',
+          income_source: { in: ['withdrawal', 'income_withdrawal'] },
+          status: { in: ['COMPLETED', 'PENDING'] }
+        }
+      });
+
+      // Calculate available withdrawable balance
+      const totalWithdrawableIncome = withdrawableTransactions._sum.amount ? parseFloat(withdrawableTransactions._sum.amount.toString()) : 0;
+      const totalWithdrawnAmount = totalWithdrawn._sum.amount ? parseFloat(totalWithdrawn._sum.amount.toString()) : 0;
+      const availableWithdrawableBalance = Math.max(0, totalWithdrawableIncome - totalWithdrawnAmount);
+
+      // Check if user has enough withdrawable income balance
+      if (availableWithdrawableBalance < amount) {
+        throw new Error(`Insufficient withdrawable income. Available: $${availableWithdrawableBalance.toFixed(2)}, Requested: $${amount}. Note: Deposited amounts are locked for 6 months.`);
+      }
+
+      // Get or create wallet for balance tracking
       let wallet = await prisma.wallets.findUnique({
         where: { user_id: userId },
       });
 
-      // If wallet doesn't exist, create one with 0 balance
       if (!wallet) {
         wallet = await prisma.wallets.create({
           data: {
@@ -91,11 +129,6 @@ withdrawalRouter.post('/income', async (req, res) => {
             balance: 0,
           },
         });
-      }
-
-      // Check if user has enough balance
-      if (Number(wallet.balance) < amount) {
-        throw new Error(`Insufficient balance. Available: $${Number(wallet.balance)}, Requested: $${amount}`);
       }
 
       // Create withdrawal transaction
@@ -478,12 +511,41 @@ withdrawalRouter.get('/stats', async (req, res) => {
   const userId = req.user.id;
 
   try {
-    // Get wallet balance
-    const wallet = await prisma.wallets.findUnique({
-      where: { user_id: userId },
+    // Get withdrawable balance (only from unlocked income transactions)
+    const withdrawableTransactions = await prisma.transactions.aggregate({
+      _sum: { amount: true },
+      where: {
+        user_id: userId,
+        type: 'credit',
+        unlock_date: { lte: new Date() }, // Only unlocked transactions
+        OR: [
+          { income_source: 'direct_income' },
+          { income_source: 'team_income' },
+          { income_source: 'salary_income' },
+          { income_source: 'monthly_profit' },
+          { income_source: { contains: 'income' } }
+        ],
+        status: 'COMPLETED'
+      }
     });
 
-    // Get total withdrawals
+    // Get already withdrawn amounts
+    const totalWithdrawn = await prisma.transactions.aggregate({
+      _sum: { amount: true },
+      where: {
+        user_id: userId,
+        type: 'debit',
+        income_source: { in: ['withdrawal', 'income_withdrawal'] },
+        status: { in: ['COMPLETED', 'PENDING'] } // Include pending to show accurate available balance
+      }
+    });
+
+    // Calculate available withdrawable balance
+    const totalWithdrawableIncome = withdrawableTransactions._sum.amount ? parseFloat(withdrawableTransactions._sum.amount.toString()) : 0;
+    const totalWithdrawnAmount = totalWithdrawn._sum.amount ? parseFloat(totalWithdrawn._sum.amount.toString()) : 0;
+    const availableWithdrawableBalance = Math.max(0, totalWithdrawableIncome - totalWithdrawnAmount);
+
+    // Get total withdrawals (completed only)
     const totalWithdrawals = await prisma.transactions.aggregate({
       _sum: { amount: true },
       _count: { id: true },
@@ -528,13 +590,16 @@ withdrawalRouter.get('/stats', async (req, res) => {
     res.json({
       success: true,
       stats: {
-        available_balance: wallet ? parseFloat(wallet.balance.toString()) : 0,
+        available_balance: availableWithdrawableBalance, // Only withdrawable income, not locked deposits
         total_withdrawn: totalWithdrawals._sum.amount ? parseFloat(totalWithdrawals._sum.amount.toString()) : 0,
         total_withdrawal_count: totalWithdrawals._count.id || 0,
         pending_amount: pendingWithdrawals._sum.amount ? parseFloat(pendingWithdrawals._sum.amount.toString()) : 0,
         pending_count: pendingWithdrawals._count.id || 0,
         eligible_investments_count: eligibleInvestments.length,
         total_investments_count: investments.length,
+        // Additional info for debugging
+        total_withdrawable_income: totalWithdrawableIncome,
+        total_withdrawn_amount: totalWithdrawnAmount,
       },
     });
   } catch (error) {
