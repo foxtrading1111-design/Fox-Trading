@@ -132,14 +132,14 @@ userRouter.get('/dashboard', async (req, res) => {
             }
         });
 
-        // Total income from all sources (referral, team, salary) - exclude deposits
+        // Total income from all sources (referral, team, salary, monthly profit) - exclude deposits
         const totalIncomeAgg = await prisma.transactions.aggregate({
             _sum: { amount: true },
             where: { 
                 user_id: userId, 
                 type: 'credit',
                 income_source: { 
-                    in: ['direct_income', 'team_income', 'salary_income', 'daily_profit']
+                    in: ['direct_income', 'team_income', 'salary_income', 'daily_profit', 'monthly_profit']
                 }
             }
         });
@@ -1320,6 +1320,63 @@ userRouter.get('/dashboard/team-income', async (req, res) => {
     }
 });
 
+// Monthly Profit Tab - Shows user's monthly investment profits
+userRouter.get('/dashboard/monthly-profit', async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const monthlyProfitTransactions = await prisma.transactions.findMany({
+            where: {
+                user_id: userId,
+                type: 'credit',
+                income_source: 'monthly_profit',
+                status: 'COMPLETED'
+            },
+            orderBy: { timestamp: 'desc' }
+        });
+        
+        const totalMonthlyProfit = monthlyProfitTransactions.reduce(
+            (sum, tx) => sum + Number(tx.amount), 0
+        );
+        
+        const todaysMonthlyProfit = monthlyProfitTransactions
+            .filter(tx => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                return tx.timestamp >= today && tx.timestamp < tomorrow;
+            })
+            .reduce((sum, tx) => sum + Number(tx.amount), 0);
+        
+        // Get user's current deposits to calculate expected monthly profit
+        const activeDeposits = await prisma.transactions.aggregate({
+            _sum: { amount: true },
+            where: {
+                user_id: userId,
+                type: 'credit',
+                income_source: 'investment_deposit',
+                status: 'COMPLETED',
+                unlock_date: { not: null }
+            }
+        });
+        
+        const totalActiveDeposits = Number(activeDeposits._sum.amount || 0);
+        const expectedMonthlyProfit = totalActiveDeposits * 0.10; // 10% monthly
+        
+        return res.json({
+            totalMonthlyProfit,
+            todaysMonthlyProfit,
+            totalActiveDeposits,
+            expectedMonthlyProfit,
+            transactions: monthlyProfitTransactions,
+            transactionCount: monthlyProfitTransactions.length
+        });
+    } catch (error) {
+        console.error('Monthly profit error:', error);
+        return res.status(500).json({ error: 'Failed to load monthly profit' });
+    }
+});
+
 // Today's Withdrawal Tab
 userRouter.get('/dashboard/today-withdrawal', async (req, res) => {
     const userId = req.user.id;
@@ -1400,14 +1457,14 @@ userRouter.get('/dashboard/total-withdrawal', async (req, res) => {
 userRouter.get('/withdrawal/eligibility', async (req, res) => {
     const userId = req.user.id;
     try {
-        // Get wallet balance
+        // Get wallet balance (this contains all withdrawable income)
         const wallet = await prisma.wallets.findUnique({
             where: { user_id: userId }
         });
         
-        const totalBalance = Number(wallet?.balance || 0);
+        const totalWalletBalance = Number(wallet?.balance || 0);
         
-        // Get locked deposits (deposits with unlock_date in future)
+        // Get locked deposits (investment deposits with unlock_date in future)
         const lockedDeposits = await prisma.transactions.aggregate({
             _sum: { amount: true },
             where: {
@@ -1419,7 +1476,21 @@ userRouter.get('/withdrawal/eligibility', async (req, res) => {
             }
         });
         
-        const lockedAmount = Number(lockedDeposits._sum.amount || 0);
+        const lockedDepositAmount = Number(lockedDeposits._sum.amount || 0);
+        
+        // Get unlocked deposits (investment deposits that can now be withdrawn)
+        const unlockedDeposits = await prisma.transactions.aggregate({
+            _sum: { amount: true },
+            where: {
+                user_id: userId,
+                type: 'credit',
+                income_source: 'investment_deposit',
+                status: 'COMPLETED',
+                unlock_date: { lte: new Date() } // Past unlock date
+            }
+        });
+        
+        const unlockedDepositAmount = Number(unlockedDeposits._sum.amount || 0);
         
         // Get pending withdrawals
         const pendingWithdrawals = await prisma.transactions.aggregate({
@@ -1433,18 +1504,19 @@ userRouter.get('/withdrawal/eligibility', async (req, res) => {
         
         const pendingAmount = Number(pendingWithdrawals._sum.amount || 0);
         
-        // Available balance = total - locked - pending
-        const withdrawableBalance = Math.max(0, totalBalance - lockedAmount - pendingAmount);
+        // Withdrawable balance = wallet balance (income) + unlocked deposits - pending withdrawals
+        const withdrawableBalance = Math.max(0, totalWalletBalance + unlockedDepositAmount - pendingAmount);
         
         const withdrawalFee = 1.00;
         const minWithdrawal = 10.00;
         const maxWithdrawalPerDay = withdrawableBalance; // No daily limit
         
         return res.json({
-            totalBalance,
-            lockedAmount,
-            pendingAmount,
-            withdrawableBalance,
+            totalWalletBalance,        // Income balance (always withdrawable)
+            lockedDepositAmount,       // Locked deposits (6-month lock)
+            unlockedDepositAmount,     // Unlocked deposits (can be withdrawn)
+            pendingAmount,             // Pending withdrawals
+            withdrawableBalance,       // Total available for withdrawal
             netWithdrawable: Math.max(0, withdrawableBalance - withdrawalFee),
             withdrawalFee,
             minWithdrawal,
@@ -1473,7 +1545,23 @@ userRouter.post('/admin/calculate-profits', async (req, res) => {
     }
 });
 
-// Admin endpoint to manually trigger team income distribution
+// Admin endpoint to manually trigger monthly profit distribution
+userRouter.post('/admin/distribute-monthly-profits', async (req, res) => {
+    try {
+        if (req.user.role !== 'ADMIN') {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+        
+        const { processMonthlyProfitDistribution } = await import('../services/monthlyProfitDistribution.js');
+        const result = await processMonthlyProfitDistribution();
+        return res.json(result);
+    } catch (error) {
+        console.error('Manual monthly profit distribution error:', error);
+        return res.status(500).json({ error: 'Failed to distribute monthly profits' });
+    }
+});
+
+// Admin endpoint to manually trigger team income distribution (legacy)
 userRouter.post('/admin/distribute-team-income', async (req, res) => {
     try {
         if (req.user.role !== 'ADMIN') {

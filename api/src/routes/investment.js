@@ -52,21 +52,35 @@ investmentRouter.post('/deposit', async (req, res) => {
         },
       });
 
-      // Process ONE-TIME direct income for direct referrer only when user makes first deposit
+      // Get user info for referral processing
       const user = await tx.users.findUnique({ 
         where: { id: userId }, 
         select: { sponsor_id: true, full_name: true, email: true } 
       });
       
+      // Store deposit with 6-month unlock period (this is the locked investment)
+      const depositTransaction = await tx.transactions.create({
+        data: {
+          user_id: userId,
+          amount: amount,
+          type: 'credit',
+          income_source: 'investment_deposit',
+          description: `Investment deposit - $${amount} - locked for 6 months`,
+          status: 'COMPLETED',
+          unlock_date: new Date(Date.now() + (6 * 30 * 24 * 60 * 60 * 1000)) // 6 months from now
+        },
+      });
+      
+      // Process ONE-TIME direct income for direct referrer only on first deposit
       if (user?.sponsor_id) {
         // Check if this is user's first deposit/investment
         const existingDeposits = await tx.transactions.count({
           where: {
             user_id: userId,
-            OR: [
-              { type: 'DEPOSIT', status: 'COMPLETED' },
-              { type: 'credit', income_source: { endsWith: '_deposit' } }
-            ]
+            type: 'credit',
+            income_source: 'investment_deposit',
+            status: 'COMPLETED',
+            id: { not: depositTransaction.id } // Exclude current deposit
           }
         });
         
@@ -96,19 +110,6 @@ investmentRouter.post('/deposit', async (req, res) => {
             });
           }
         }
-        
-        // Store deposit with 6-month unlock period
-        await tx.transactions.create({
-          data: {
-            user_id: userId,
-            amount: amount,
-            type: 'credit',
-            income_source: 'investment_deposit',
-            description: `Investment deposit - $${amount} - 6 month lock period`,
-            status: 'COMPLETED',
-            unlock_date: new Date(Date.now() + (6 * 30 * 24 * 60 * 60 * 1000)) // 6 months from now
-          },
-        });
       }
       return createdInvestment;
     });
