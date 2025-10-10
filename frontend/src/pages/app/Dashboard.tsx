@@ -21,17 +21,32 @@ import {
 import { useDashboardData } from '@/hooks/use-api';
 import { toast } from '@/hooks/use-toast';
 import CryptoPrices from '@/components/CryptoPrices';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DirectIncome from './DirectIncome';
-import TeamIncome from './TeamIncome';
-import TodayWithdrawal from './TodayWithdrawal';
-import TotalWithdrawal from './TotalWithdrawal';
-import MyIncome from './MyIncome'; // Salary Income (existing component)
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 
 const Dashboard: React.FC = () => {
   const [showBalance, setShowBalance] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const { data, loading, error } = useDashboardData();
+  
+  // Fetch additional income data
+  const { data: directIncomeData } = useQuery({ 
+    queryKey: ['direct-income'], 
+    queryFn: () => api('/api/user/dashboard/direct-income'),
+    enabled: !!data
+  });
+  
+  const { data: teamIncomeData } = useQuery({ 
+    queryKey: ['team-income'], 
+    queryFn: () => api('/api/user/dashboard/team-income'),
+    enabled: !!data
+  });
+  
+  const { data: todayWithdrawalData } = useQuery({ 
+    queryKey: ['today-withdrawal'], 
+    queryFn: () => api('/api/user/dashboard/today-withdrawal'),
+    enabled: !!data
+  });
   
   // Update timestamp when data changes
   React.useEffect(() => {
@@ -75,7 +90,7 @@ const Dashboard: React.FC = () => {
     name: data.user_name,
     referralCode: data.referral_code,
     email: data.user_email,
-    totalBalance: Number(data.wallet_balance),
+    totalBalance: Number(data.wallet_balance), // This shows deposited amount as requested
     dailyIncome: Number(data.daily_income),
     totalIncome: Number(data.total_income),
     totalWithdrawal: Number(data.total_withdrawal),
@@ -86,7 +101,11 @@ const Dashboard: React.FC = () => {
     leftLegBusiness: Number(data.left_leg_business),
     totalBusiness: Number(data.total_business),
     directTeam: data.direct_team,
-    totalTeam: data.total_team
+    totalTeam: data.total_team,
+    // New income data
+    directIncome: Number(directIncomeData?.totalDirectIncome || 0),
+    teamIncome: Number(teamIncomeData?.totalTeamIncome || 0),
+    todayWithdrawal: Number(todayWithdrawalData?.totalTodayWithdrawal || 0)
   };
 
   const copyToClipboard = (text: string) => {
@@ -177,7 +196,7 @@ const Dashboard: React.FC = () => {
       </Card>
 
       {/* Income & Withdrawal Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
         {/* Daily Income */}
         <Card className="border-green-500/20">
           <CardHeader className="pb-2 sm:pb-3">
@@ -208,20 +227,56 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Today's Investment Profit */}
-        <Card className="border-purple-500/20">
+        {/* Direct Income */}
+        <Card className="border-orange-500/20">
           <CardHeader className="pb-2 sm:pb-3">
             <CardTitle className="text-xs sm:text-sm flex items-center gap-2">
-              <BarChart3 size={14} className="text-purple-500 sm:w-4 sm:h-4" />
-              Today's Investment Profit
+              <UserCheck size={14} className="text-orange-500 sm:w-4 sm:h-4" />
+              Direct Income
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-500">
-              ${userStats.todayInvestmentProfit.toFixed(2)}
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-500">
+              ${userStats.directIncome?.toLocaleString() || '0'}
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              0.333% daily from investments
+              One-time 10% bonus
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Team Income */}
+        <Card className="border-cyan-500/20">
+          <CardHeader className="pb-2 sm:pb-3">
+            <CardTitle className="text-xs sm:text-sm flex items-center gap-2">
+              <Users size={14} className="text-cyan-500 sm:w-4 sm:h-4" />
+              Team Income
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-cyan-500">
+              ${userStats.teamIncome?.toLocaleString() || '0'}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Multi-level earnings
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Today's Withdrawal */}
+        <Card className="border-pink-500/20">
+          <CardHeader className="pb-2 sm:pb-3">
+            <CardTitle className="text-xs sm:text-sm flex items-center gap-2">
+              <ArrowDown size={14} className="text-pink-500 sm:w-4 sm:h-4" />
+              Today's Withdrawal
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-lg sm:text-xl lg:text-2xl font-bold text-pink-500">
+              ${userStats.todayWithdrawal?.toLocaleString() || '0'}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Today's withdrawals
             </div>
           </CardContent>
         </Card>
@@ -309,57 +364,6 @@ const Dashboard: React.FC = () => {
         </Card>
       </div>
 
-      {/* Dashboard Tabs Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl flex items-center gap-2">
-            <BarChart3 size={20} />
-            Dashboard Tabs
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-              <TabsTrigger value="direct-income" className="text-xs sm:text-sm">Direct Income</TabsTrigger>
-              <TabsTrigger value="team-income" className="text-xs sm:text-sm">Team Income</TabsTrigger>
-              <TabsTrigger value="salary-income" className="text-xs sm:text-sm">Salary Income</TabsTrigger>
-              <TabsTrigger value="today-withdrawal" className="text-xs sm:text-sm">Today Withdrawal</TabsTrigger>
-              <TabsTrigger value="total-withdrawal" className="text-xs sm:text-sm">Total Withdrawal</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="overview" className="mt-6">
-              <div className="text-center py-8">
-                <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-lg font-medium text-muted-foreground">Main Dashboard Overview</p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  This is your main dashboard showing key metrics and recent activity.
-                </p>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="direct-income" className="mt-6">
-              <DirectIncome />
-            </TabsContent>
-            
-            <TabsContent value="team-income" className="mt-6">
-              <TeamIncome />
-            </TabsContent>
-            
-            <TabsContent value="salary-income" className="mt-6">
-              <MyIncome />
-            </TabsContent>
-            
-            <TabsContent value="today-withdrawal" className="mt-6">
-              <TodayWithdrawal />
-            </TabsContent>
-            
-            <TabsContent value="total-withdrawal" className="mt-6">
-              <TotalWithdrawal />
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
 
       {/* Live Crypto Markets */}
       <CryptoPrices />
