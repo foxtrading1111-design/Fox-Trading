@@ -53,9 +53,19 @@ type DashboardData = {
 const DirectIncome: React.FC = () => {
   const [timeFilter, setTimeFilter] = useState<string>('ALL');
 
-  const { data: dashboardData, isLoading, refetch } = useQuery<DashboardData>({ 
-    queryKey: ['dashboard'], 
-    queryFn: () => api<DashboardData>('/api/user/dashboard') 
+  const { data: directIncomeData, isLoading, refetch } = useQuery<{ 
+    totalDirectIncome: number;
+    todaysDirectIncome: number;
+    transactions: Transaction[];
+    transactionCount: number;
+  }>({ 
+    queryKey: ['direct-income'], 
+    queryFn: () => api<{ 
+      totalDirectIncome: number;
+      todaysDirectIncome: number;
+      transactions: Transaction[];
+      transactionCount: number;
+    }>('/api/user/dashboard/direct-income') 
   });
 
   const formatCurrency = (amount: number) => {
@@ -98,29 +108,24 @@ const DirectIncome: React.FC = () => {
     return transactions.filter(t => new Date(t.timestamp) >= filterDate);
   };
 
-  // Get direct income transactions
-  const directIncomeTransactions = dashboardData?.recent_transactions?.filter(
-    transaction => 
-      transaction.type === 'credit' && 
-      (transaction.income_source === 'direct_income' || 
-       transaction.description.toLowerCase().includes('direct'))
-  ) || [];
+  // Get direct income transactions from new API
+  const directIncomeTransactions = directIncomeData?.transactions || [];
 
   // Apply time filter
   const filteredTransactions = filterTransactionsByTime(directIncomeTransactions);
 
-  // Calculate totals
-  const totalDirectIncome = dashboardData?.income_breakdown?.find(
-    item => item.source === 'direct_income'
-  )?.amount || 0;
+  // Calculate totals from new API structure
+  const totalDirectIncome = directIncomeData?.totalDirectIncome || 0;
+  const todaysDirectIncome = directIncomeData?.todaysDirectIncome || 0;
 
   const periodTotal = filteredTransactions.reduce(
     (sum, transaction) => sum + Number(transaction.amount), 
     0
   );
 
-  const directTeamCount = dashboardData?.direct_team || 0;
-  const averagePerReferral = directTeamCount > 0 ? Number(totalDirectIncome) / directTeamCount : 0;
+  // Calculate average (one-time income per referral)
+  const transactionCount = directIncomeData?.transactionCount || 0;
+  const averagePerReferral = transactionCount > 0 ? Number(totalDirectIncome) / transactionCount : 0;
 
   // Group transactions by month for chart
   const monthlyData = filteredTransactions.reduce((acc, transaction) => {
@@ -193,9 +198,9 @@ const DirectIncome: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-yellow-500">Direct Income (Level 1)</h1>
+        <h1 className="text-2xl font-bold text-yellow-500">Direct Income</h1>
         <p className="text-muted-foreground mt-2">
-          Track your Level 1 (direct) referral bonuses from immediate team members
+          One-time 10% income from direct referrals' first deposits only
         </p>
       </div>
 
@@ -233,9 +238,9 @@ const DirectIncome: React.FC = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Direct Referrals</p>
-                <p className="text-2xl font-bold text-purple-600">{directTeamCount}</p>
-                <p className="text-xs text-muted-foreground mt-1">Active team members</p>
+                <p className="text-sm font-medium text-muted-foreground">Today's Direct Income</p>
+                <p className="text-2xl font-bold text-purple-600">{formatCurrency(todaysDirectIncome)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Earned today</p>
               </div>
               <UserPlus className="h-8 w-8 text-purple-600" />
             </div>
@@ -402,7 +407,7 @@ const DirectIncome: React.FC = () => {
                 </p>
                 <div className="mt-4 p-4 bg-blue-50 rounded-lg">
                   <p className="text-sm text-blue-700">
-                    <strong>Tip:</strong> Direct income is earned when someone you personally refer makes an investment or generates activity.
+                    <strong>New System:</strong> Direct income is now a one-time 10% bonus earned only when someone you personally refer makes their first deposit. No recurring income from the same referral.
                   </p>
                 </div>
               </div>

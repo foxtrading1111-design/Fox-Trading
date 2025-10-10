@@ -21,6 +21,12 @@ import {
 import { useDashboardData } from '@/hooks/use-api';
 import { toast } from '@/hooks/use-toast';
 import CryptoPrices from '@/components/CryptoPrices';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import DirectIncome from './DirectIncome';
+import TeamIncome from './TeamIncome';
+import TodayWithdrawal from './TodayWithdrawal';
+import TotalWithdrawal from './TotalWithdrawal';
+import { MyIncome } from './MyIncome'; // Salary Income (existing component)
 
 const Dashboard: React.FC = () => {
   const [showBalance, setShowBalance] = useState(true);
@@ -302,6 +308,58 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dashboard Tabs Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl flex items-center gap-2">
+            <BarChart3 size={20} />
+            Dashboard Tabs
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6">
+              <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+              <TabsTrigger value="direct-income" className="text-xs sm:text-sm">Direct Income</TabsTrigger>
+              <TabsTrigger value="team-income" className="text-xs sm:text-sm">Team Income</TabsTrigger>
+              <TabsTrigger value="salary-income" className="text-xs sm:text-sm">Salary Income</TabsTrigger>
+              <TabsTrigger value="today-withdrawal" className="text-xs sm:text-sm">Today Withdrawal</TabsTrigger>
+              <TabsTrigger value="total-withdrawal" className="text-xs sm:text-sm">Total Withdrawal</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="overview" className="mt-6">
+              <div className="text-center py-8">
+                <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-lg font-medium text-muted-foreground">Main Dashboard Overview</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  This is your main dashboard showing key metrics and recent activity.
+                </p>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="direct-income" className="mt-6">
+              <DirectIncome />
+            </TabsContent>
+            
+            <TabsContent value="team-income" className="mt-6">
+              <TeamIncome />
+            </TabsContent>
+            
+            <TabsContent value="salary-income" className="mt-6">
+              <MyIncome />
+            </TabsContent>
+            
+            <TabsContent value="today-withdrawal" className="mt-6">
+              <TodayWithdrawal />
+            </TabsContent>
+            
+            <TabsContent value="total-withdrawal" className="mt-6">
+              <TotalWithdrawal />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       {/* Live Crypto Markets */}
       <CryptoPrices />

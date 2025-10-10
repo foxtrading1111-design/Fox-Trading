@@ -85,15 +85,14 @@ userRouter.get('/dashboard', async (req, res) => {
             select: { full_name: true, email: true, referral_code: true, created_at: true }
         });
 
-        // Get investment data (use completed deposits as investments)
-        const investmentAgg = await prisma.transactions.aggregate({
+        // Get total deposited amount only (for total balance display)
+        const depositedAmountAgg = await prisma.transactions.aggregate({
             _sum: { amount: true }, 
             where: { 
                 user_id: userId, 
-                OR: [
-                    { type: 'DEPOSIT', status: 'COMPLETED' },
-                    { type: 'credit', income_source: { endsWith: '_deposit' } }
-                ]
+                type: 'credit',
+                income_source: 'investment_deposit',
+                status: 'COMPLETED'
             },
         });
 
@@ -118,7 +117,7 @@ userRouter.get('/dashboard', async (req, res) => {
             where: { user_id: userId, type: 'credit', status: 'COMPLETED' },
         });
 
-        // Daily income (today's credits)
+        // Daily income display - just show "daily income" label (as requested)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
@@ -133,10 +132,16 @@ userRouter.get('/dashboard', async (req, res) => {
             }
         });
 
-        // Total income (all credits)
+        // Total income from all sources (referral, team, salary) - exclude deposits
         const totalIncomeAgg = await prisma.transactions.aggregate({
             _sum: { amount: true },
-            where: { user_id: userId, type: 'credit' }
+            where: { 
+                user_id: userId, 
+                type: 'credit',
+                income_source: { 
+                    in: ['direct_income', 'team_income', 'salary_income', 'daily_profit']
+                }
+            }
         });
 
         // Total withdrawals (all debits)
@@ -228,10 +233,10 @@ userRouter.get('/dashboard', async (req, res) => {
             join_date: user?.created_at ?? null,
             
             // Financial data
-            total_investment: investmentAgg._sum.amount ?? 0,
-            wallet_balance: wallet?.balance ?? 0,
-            daily_income: dailyIncomeAgg._sum.amount ?? 0,
-            total_income: totalIncomeAgg._sum.amount ?? 0,
+            total_investment: depositedAmountAgg._sum.amount ?? 0, // Total deposited amount
+            wallet_balance: depositedAmountAgg._sum.amount ?? 0, // Show only deposited amount as total balance
+            daily_income: dailyIncomeAgg._sum.amount ?? 0, // Today's income
+            total_income: totalIncomeAgg._sum.amount ?? 0, // Income from all sources (referral, team, salary)
             total_withdrawal: totalWithdrawalAgg._sum.amount ?? 0,
             today_investment_profit: todayInvestmentProfit,
             total_investment_profit: totalInvestmentProfit,
@@ -1220,6 +1225,238 @@ userRouter.post('/submit-deposit', upload.single('screenshot'), async (req, res)
     }
 });
 
+// New Dashboard Tabs Endpoints
+
+// Direct Income Tab - One-time 10% income from direct referrals
+userRouter.get('/dashboard/direct-income', async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const directIncomeTransactions = await prisma.transactions.findMany({
+            where: {
+                user_id: userId,
+                type: 'credit',
+                income_source: 'direct_income',
+                status: 'COMPLETED'
+            },
+            orderBy: { timestamp: 'desc' }
+        });
+        
+        const totalDirectIncome = directIncomeTransactions.reduce(
+            (sum, tx) => sum + Number(tx.amount), 0
+        );
+        
+        const todaysDirectIncome = directIncomeTransactions
+            .filter(tx => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                return tx.timestamp >= today && tx.timestamp < tomorrow;
+            })
+            .reduce((sum, tx) => sum + Number(tx.amount), 0);
+        
+        return res.json({
+            totalDirectIncome,
+            todaysDirectIncome,
+            transactions: directIncomeTransactions,
+            transactionCount: directIncomeTransactions.length
+        });
+    } catch (error) {
+        console.error('Direct income error:', error);
+        return res.status(500).json({ error: 'Failed to load direct income' });
+    }
+});
+
+// Team Income Tab - Multi-level income from team's monthly earnings
+userRouter.get('/dashboard/team-income', async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const teamIncomeTransactions = await prisma.transactions.findMany({
+            where: {
+                user_id: userId,
+                type: 'credit',
+                income_source: 'team_income',
+                status: 'COMPLETED'
+            },
+            orderBy: { timestamp: 'desc' }
+        });
+        
+        // Group by level
+        const levelBreakdown = teamIncomeTransactions.reduce((acc, tx) => {
+            const level = tx.referral_level || 1;
+            if (!acc[level]) {
+                acc[level] = { count: 0, amount: 0, transactions: [] };
+            }
+            acc[level].count++;
+            acc[level].amount += Number(tx.amount);
+            acc[level].transactions.push(tx);
+            return acc;
+        }, {});
+        
+        const totalTeamIncome = teamIncomeTransactions.reduce(
+            (sum, tx) => sum + Number(tx.amount), 0
+        );
+        
+        const todaysTeamIncome = teamIncomeTransactions
+            .filter(tx => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                return tx.timestamp >= today && tx.timestamp < tomorrow;
+            })
+            .reduce((sum, tx) => sum + Number(tx.amount), 0);
+        
+        return res.json({
+            totalTeamIncome,
+            todaysTeamIncome,
+            levelBreakdown,
+            transactions: teamIncomeTransactions,
+            transactionCount: teamIncomeTransactions.length
+        });
+    } catch (error) {
+        console.error('Team income error:', error);
+        return res.status(500).json({ error: 'Failed to load team income' });
+    }
+});
+
+// Today's Withdrawal Tab
+userRouter.get('/dashboard/today-withdrawal', async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
+        const todayWithdrawals = await prisma.transactions.findMany({
+            where: {
+                user_id: userId,
+                type: 'debit',
+                income_source: 'WITHDRAWAL',
+                timestamp: { gte: today, lt: tomorrow }
+            },
+            orderBy: { timestamp: 'desc' }
+        });
+        
+        const totalTodayWithdrawal = todayWithdrawals.reduce(
+            (sum, tx) => sum + Number(tx.amount), 0
+        );
+        
+        return res.json({
+            totalTodayWithdrawal,
+            withdrawals: todayWithdrawals,
+            withdrawalCount: todayWithdrawals.length
+        });
+    } catch (error) {
+        console.error("Today's withdrawal error:", error);
+        return res.status(500).json({ error: "Failed to load today's withdrawals" });
+    }
+});
+
+// Total Withdrawal Tab
+userRouter.get('/dashboard/total-withdrawal', async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const allWithdrawals = await prisma.transactions.findMany({
+            where: {
+                user_id: userId,
+                type: 'debit',
+                income_source: 'WITHDRAWAL'
+            },
+            orderBy: { timestamp: 'desc' }
+        });
+        
+        const totalWithdrawals = allWithdrawals.reduce(
+            (sum, tx) => sum + Number(tx.amount), 0
+        );
+        
+        const completedWithdrawals = allWithdrawals.filter(tx => tx.status === 'COMPLETED');
+        const pendingWithdrawals = allWithdrawals.filter(tx => tx.status === 'PENDING');
+        
+        const totalCompleted = completedWithdrawals.reduce(
+            (sum, tx) => sum + Number(tx.amount), 0
+        );
+        const totalPending = pendingWithdrawals.reduce(
+            (sum, tx) => sum + Number(tx.amount), 0
+        );
+        
+        return res.json({
+            totalWithdrawals,
+            totalCompleted,
+            totalPending,
+            withdrawals: allWithdrawals,
+            withdrawalCount: allWithdrawals.length,
+            completedCount: completedWithdrawals.length,
+            pendingCount: pendingWithdrawals.length
+        });
+    } catch (error) {
+        console.error('Total withdrawal error:', error);
+        return res.status(500).json({ error: 'Failed to load total withdrawals' });
+    }
+});
+
+// Withdrawal eligibility check - implements 6-month lock for deposits
+userRouter.get('/withdrawal/eligibility', async (req, res) => {
+    const userId = req.user.id;
+    try {
+        // Get wallet balance
+        const wallet = await prisma.wallets.findUnique({
+            where: { user_id: userId }
+        });
+        
+        const totalBalance = Number(wallet?.balance || 0);
+        
+        // Get locked deposits (deposits with unlock_date in future)
+        const lockedDeposits = await prisma.transactions.aggregate({
+            _sum: { amount: true },
+            where: {
+                user_id: userId,
+                type: 'credit',
+                income_source: 'investment_deposit',
+                status: 'COMPLETED',
+                unlock_date: { gt: new Date() } // Future unlock date
+            }
+        });
+        
+        const lockedAmount = Number(lockedDeposits._sum.amount || 0);
+        
+        // Get pending withdrawals
+        const pendingWithdrawals = await prisma.transactions.aggregate({
+            _sum: { amount: true },
+            where: {
+                user_id: userId,
+                type: 'debit',
+                status: 'PENDING'
+            }
+        });
+        
+        const pendingAmount = Number(pendingWithdrawals._sum.amount || 0);
+        
+        // Available balance = total - locked - pending
+        const withdrawableBalance = Math.max(0, totalBalance - lockedAmount - pendingAmount);
+        
+        const withdrawalFee = 1.00;
+        const minWithdrawal = 10.00;
+        const maxWithdrawalPerDay = withdrawableBalance; // No daily limit
+        
+        return res.json({
+            totalBalance,
+            lockedAmount,
+            pendingAmount,
+            withdrawableBalance,
+            netWithdrawable: Math.max(0, withdrawableBalance - withdrawalFee),
+            withdrawalFee,
+            minWithdrawal,
+            maxWithdrawalPerDay,
+            canWithdraw: withdrawableBalance >= (minWithdrawal + withdrawalFee)
+        });
+    } catch (error) {
+        console.error('Withdrawal eligibility error:', error);
+        return res.status(500).json({ error: 'Failed to check withdrawal eligibility' });
+    }
+});
+
 // Admin endpoint to manually trigger daily investment profit calculation
 userRouter.post('/admin/calculate-profits', async (req, res) => {
     try {
@@ -1233,5 +1470,21 @@ userRouter.post('/admin/calculate-profits', async (req, res) => {
     } catch (error) {
         console.error('Manual profit calculation error:', error);
         return res.status(500).json({ error: 'Failed to calculate profits' });
+    }
+});
+
+// Admin endpoint to manually trigger team income distribution
+userRouter.post('/admin/distribute-team-income', async (req, res) => {
+    try {
+        if (req.user.role !== 'ADMIN') {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+        
+        const { processMonthlyTeamIncome } = await import('../services/teamIncome.js');
+        const result = await processMonthlyTeamIncome();
+        return res.json(result);
+    } catch (error) {
+        console.error('Manual team income distribution error:', error);
+        return res.status(500).json({ error: 'Failed to distribute team income' });
     }
 });

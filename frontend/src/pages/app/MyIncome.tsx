@@ -92,12 +92,13 @@ const MyIncome: React.FC = () => {
   const getIncomeSourceColor = (source: string) => {
     const colors: { [key: string]: string } = {
       trading_bonus: '#3b82f6',
-      referral_income: '#10b981',
+      team_income: '#10b981',
       direct_income: '#f59e0b',
       salary_income: '#8b5cf6',
-      binary_bonus: '#ef4444',
-      level_income: '#06b6d4',
-      matching_bonus: '#84cc16',
+      daily_profit: '#ef4444',
+      binary_bonus: '#06b6d4',
+      level_income: '#84cc16',
+      matching_bonus: '#ec4899',
     };
     return colors[source] || '#6b7280';
   };
@@ -105,9 +106,10 @@ const MyIncome: React.FC = () => {
   const getIncomeSourceName = (source: string) => {
     const names: { [key: string]: string } = {
       trading_bonus: 'Trading Bonus',
-      referral_income: 'Referral Income (Multi-Level)',
-      direct_income: 'Direct Income (Level 1)',
+      team_income: 'Team Income (Multi-Level)',
+      direct_income: 'Direct Income (One-time)',
       salary_income: 'Salary Income',
+      daily_profit: 'Daily Investment Profit',
       binary_bonus: 'Binary Bonus',
       level_income: 'Level Income',
       matching_bonus: 'Matching Bonus',
@@ -172,9 +174,9 @@ const MyIncome: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-yellow-500">My Income</h1>
+        <h1 className="text-2xl font-bold text-yellow-500">Salary Income</h1>
         <p className="text-muted-foreground mt-2">
-          Comprehensive overview of your earnings and income sources
+          Rank-based salary income and comprehensive overview of all earnings
         </p>
       </div>
 

@@ -52,60 +52,63 @@ investmentRouter.post('/deposit', async (req, res) => {
         },
       });
 
-      // Process referral income for all levels when user makes any investment
+      // Process ONE-TIME direct income for direct referrer only when user makes first deposit
       const user = await tx.users.findUnique({ 
         where: { id: userId }, 
         select: { sponsor_id: true, full_name: true, email: true } 
       });
       
       if (user?.sponsor_id) {
-        // Define referral percentages for each level
-        const referralPercentages = [
-          10,  // Level 1 (Direct sponsor) - 10%
-          5,   // Level 2 - 5% 
-          3,   // Level 3 - 3%
-        ];
-
-        let currentUserId = userId;
-        for (let level = 0; level < referralPercentages.length; level++) {
-          const currentUser = await tx.users.findUnique({ 
-            where: { id: currentUserId }, 
-            select: { sponsor_id: true, full_name: true } 
-          });
+        // Check if this is user's first deposit/investment
+        const existingDeposits = await tx.transactions.count({
+          where: {
+            user_id: userId,
+            OR: [
+              { type: 'DEPOSIT', status: 'COMPLETED' },
+              { type: 'credit', income_source: { endsWith: '_deposit' } }
+            ]
+          }
+        });
+        
+        // Only give direct income for the very first deposit
+        if (existingDeposits === 0) {
+          const directIncomeAmount = Number((amount * 10 / 100).toFixed(2)); // 10% one-time
           
-          const sponsorId = currentUser?.sponsor_id;
-          if (!sponsorId) break; // No more sponsors in the chain
-
-          const referralAmount = Number((amount * referralPercentages[level] / 100).toFixed(2));
-          
-          if (referralAmount > 0) {
+          if (directIncomeAmount > 0) {
             // Ensure sponsor has a wallet
             await tx.wallets.upsert({
-              where: { user_id: sponsorId },
-              create: { user_id: sponsorId, balance: referralAmount },
-              update: { balance: { increment: referralAmount } }
+              where: { user_id: user.sponsor_id },
+              create: { user_id: user.sponsor_id, balance: directIncomeAmount },
+              update: { balance: { increment: directIncomeAmount } }
             });
             
-            // Create referral income transaction
-            const incomeSource = level === 0 ? 'direct_income' : 'referral_income';
-            const description = level === 0 
-              ? `Direct income (${referralPercentages[level]}%) from ${user.full_name || user.email}'s investment`
-              : `Level ${level + 1} referral income (${referralPercentages[level]}%) from ${user.full_name || user.email}'s investment`;
-              
+            // Create one-time direct income transaction
             await tx.transactions.create({
               data: {
-                user_id: sponsorId,
-                amount: referralAmount,
+                user_id: user.sponsor_id,
+                amount: directIncomeAmount,
                 type: 'credit',
-                income_source: incomeSource,
-                description: description,
-                status: 'COMPLETED'
+                income_source: 'direct_income',
+                description: `One-time direct income (10%) from ${user.full_name || user.email}'s first deposit of $${amount}`,
+                status: 'COMPLETED',
+                referral_level: 1
               },
             });
           }
-          
-          currentUserId = sponsorId; // Move up the chain
         }
+        
+        // Store deposit with 6-month unlock period
+        await tx.transactions.create({
+          data: {
+            user_id: userId,
+            amount: amount,
+            type: 'credit',
+            income_source: 'investment_deposit',
+            description: `Investment deposit - $${amount} - 6 month lock period`,
+            status: 'COMPLETED',
+            unlock_date: new Date(Date.now() + (6 * 30 * 24 * 60 * 60 * 1000)) // 6 months from now
+          },
+        });
       }
       return createdInvestment;
     });

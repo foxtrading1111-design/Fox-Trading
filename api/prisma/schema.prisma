@@ -34,6 +34,9 @@ model transactions {
   status        String   @default("PENDING") @db.VarChar(10)
   description   String?
   timestamp     DateTime @default(now()) @db.Timestamp(6)
+  unlock_date   DateTime? @db.Timestamp(6) // For 6-month deposit locks
+  referral_level Int?     // Level of referral (1-20) for team income tracking
+  monthly_income_source_user_id String? @db.VarChar(30) // For tracking which user's monthly income generated this team income
   users         users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   deposit_metadata deposit_metadata?
 
