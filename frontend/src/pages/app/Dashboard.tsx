@@ -26,7 +26,7 @@ import DirectIncome from './DirectIncome';
 import TeamIncome from './TeamIncome';
 import TodayWithdrawal from './TodayWithdrawal';
 import TotalWithdrawal from './TotalWithdrawal';
-import { MyIncome } from './MyIncome'; // Salary Income (existing component)
+import MyIncome from './MyIncome'; // Salary Income (existing component)
 
 const Dashboard: React.FC = () => {
   const [showBalance, setShowBalance] = useState(true);
