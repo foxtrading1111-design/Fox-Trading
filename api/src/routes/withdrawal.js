@@ -438,53 +438,61 @@ withdrawalRouter.get('/history', async (req, res) => {
 
 /**
  * GET /api/withdrawal/investments
- * Get user's investments with withdrawal eligibility
+ * Get user's deposits (investments) with withdrawal eligibility from transactions table
  */
 withdrawalRouter.get('/investments', async (req, res) => {
   const userId = req.user.id;
 
   try {
-    const investments = await prisma.investments.findMany({
+    // Fetch all deposit transactions for the user
+    const depositTransactions = await prisma.transactions.findMany({
       where: {
         user_id: userId,
-        status: { in: ['active', 'withdrawing'] }
+        type: 'credit',
+        income_source: { endsWith: '_deposit' }, // BEP20_deposit, TRC20_deposit, etc.
+        status: 'COMPLETED'
       },
       select: {
         id: true,
         amount: true,
-        package_name: true,
-        start_date: true,
+        income_source: true,
+        timestamp: true,
         unlock_date: true,
-        status: true,
-        monthly_profit_rate: true,
+        description: true
       },
       orderBy: {
-        start_date: 'desc',
+        timestamp: 'desc',
       },
     });
 
-    const investmentsWithEligibility = investments.map((investment) => {
-      const currentDate = new Date();
-      const investmentDate = new Date(investment.start_date);
-      const monthsDifference = (currentDate.getFullYear() - investmentDate.getFullYear()) * 12 + 
-                              (currentDate.getMonth() - investmentDate.getMonth());
+    const currentDate = new Date();
+    
+    const investmentsWithEligibility = depositTransactions.map((deposit) => {
+      const depositDate = new Date(deposit.timestamp);
+      const unlockDate = deposit.unlock_date ? new Date(deposit.unlock_date) : new Date(depositDate.setMonth(depositDate.getMonth() + 6));
       
-      const isEligible = monthsDifference >= 6 && investment.status === 'active';
-      const daysUntilEligible = isEligible ? 0 : Math.max(0, 180 - Math.floor((currentDate - investmentDate) / (1000 * 60 * 60 * 24)));
+      // Calculate if deposit is eligible for withdrawal (past 6 months)
+      const isEligible = currentDate >= unlockDate;
       
-      const eligibleDate = new Date(investmentDate);
-      eligibleDate.setMonth(eligibleDate.getMonth() + 6);
-
+      // Calculate days until eligible
+      const daysUntilEligible = isEligible ? 0 : Math.max(0, Math.ceil((unlockDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)));
+      
+      // Extract blockchain type from income_source (e.g., "BEP20_deposit" -> "BEP20")
+      const blockchainType = deposit.income_source.replace('_deposit', '').toUpperCase();
+      
+      // Extract amount from description or use transaction amount
+      const packageName = `${blockchainType} Deposit`;
+      
       return {
-        id: investment.id,
-        amount: parseFloat(investment.amount.toString()),
-        package_name: investment.package_name,
-        start_date: investment.start_date.toISOString(),
-        unlock_date: investment.unlock_date.toISOString(),
-        status: investment.status,
-        monthly_profit_rate: parseFloat(investment.monthly_profit_rate.toString()),
+        id: deposit.id,
+        amount: parseFloat(deposit.amount.toString()),
+        package_name: packageName,
+        start_date: deposit.timestamp.toISOString(),
+        unlock_date: unlockDate.toISOString(),
+        status: isEligible ? 'active' : 'active', // All completed deposits are active
+        monthly_profit_rate: 10, // 10% monthly profit rate
         withdrawal_eligible: isEligible,
-        eligible_date: eligibleDate.toISOString(),
+        eligible_date: unlockDate.toISOString(),
         days_until_eligible: daysUntilEligible,
         lock_period_months: 6,
       };
@@ -569,22 +577,24 @@ withdrawalRouter.get('/stats', async (req, res) => {
       },
     });
 
-    // Get eligible investments count
-    const investments = await prisma.investments.findMany({
+    // Get eligible investments count from deposit transactions
+    const depositTransactions = await prisma.transactions.findMany({
       where: {
         user_id: userId,
-        status: 'active'
+        type: 'credit',
+        income_source: { endsWith: '_deposit' },
+        status: 'COMPLETED'
       },
       select: {
-        start_date: true,
+        timestamp: true,
+        unlock_date: true,
       },
     });
 
     const currentDate = new Date();
-    const eligibleInvestments = investments.filter(investment => {
-      const monthsDifference = (currentDate.getFullYear() - investment.start_date.getFullYear()) * 12 + 
-                              (currentDate.getMonth() - investment.start_date.getMonth());
-      return monthsDifference >= 6;
+    const eligibleInvestments = depositTransactions.filter(deposit => {
+      const unlockDate = deposit.unlock_date ? new Date(deposit.unlock_date) : new Date(deposit.timestamp);
+      return currentDate >= unlockDate;
     });
 
     res.json({
@@ -596,7 +606,7 @@ withdrawalRouter.get('/stats', async (req, res) => {
         pending_amount: pendingWithdrawals._sum.amount ? parseFloat(pendingWithdrawals._sum.amount.toString()) : 0,
         pending_count: pendingWithdrawals._count.id || 0,
         eligible_investments_count: eligibleInvestments.length,
-        total_investments_count: investments.length,
+        total_investments_count: depositTransactions.length,
         // Additional info for debugging
         total_withdrawable_income: totalWithdrawableIncome,
         total_withdrawn_amount: totalWithdrawnAmount,
