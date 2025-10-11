@@ -9,6 +9,7 @@ import {
   Users, 
   Target,
   Copy,
+  Check,
   Eye,
   EyeOff,
   ArrowUp,
@@ -108,9 +109,16 @@ const Dashboard: React.FC = () => {
     todayWithdrawal: Number(todayWithdrawalData?.totalTodayWithdrawal || 0)
   };
 
-  const copyToClipboard = (text: string) => {
+  const [copiedItem, setCopiedItem] = React.useState<string | null>(null);
+
+  const copyToClipboard = (text: string, itemName: string) => {
     navigator.clipboard.writeText(text);
+    setCopiedItem(itemName);
+    setTimeout(() => setCopiedItem(null), 2000);
   };
+
+  // Generate referral link
+  const referralLink = `${window.location.origin}/register?ref=${userStats.referralCode}`;
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-6 sm:pb-8">
@@ -136,7 +144,7 @@ const Dashboard: React.FC = () => {
             <p className="text-xl sm:text-2xl font-bold text-yellow-500 truncate">{userStats.name}</p>
           </div>
           
-          {/* Referral Code */}
+          {/* Referral Code & Link */}
           <div className="space-y-1 sm:space-y-2">
             <p className="text-xs sm:text-sm text-muted-foreground">Referral Code</p>
             <div className="flex items-center gap-2">
@@ -147,9 +155,26 @@ const Dashboard: React.FC = () => {
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 sm:h-8 sm:w-8 hover:bg-yellow-500/10 shrink-0"
-                onClick={() => copyToClipboard(userStats.referralCode)}
+                onClick={() => copyToClipboard(userStats.referralCode, 'code')}
+                title="Copy referral code"
               >
-                <Copy size={12} className="sm:w-3.5 sm:h-3.5" />
+                {copiedItem === 'code' ? <Check size={12} className="sm:w-3.5 sm:h-3.5 text-green-500" /> : <Copy size={12} className="sm:w-3.5 sm:h-3.5" />}
+              </Button>
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground truncate" title={referralLink}>
+                  {referralLink}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 hover:bg-yellow-500/10 shrink-0"
+                onClick={() => copyToClipboard(referralLink, 'link')}
+                title="Copy referral link"
+              >
+                {copiedItem === 'link' ? <Check size={10} className="text-green-500" /> : <Copy size={10} />}
               </Button>
             </div>
           </div>

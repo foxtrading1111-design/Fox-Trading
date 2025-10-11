@@ -1,14 +1,16 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
+import { toast } from 'sonner';
 
 export default function RegisterPage() {
   const { setToken } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [sponsorCode, setSponsorCode] = useState('');
   const [sponsorName, setSponsorName] = useState<string | null>(null);
@@ -20,6 +22,33 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  // Auto-fill referral code from URL parameter
+  useEffect(() => {
+    const refCode = searchParams.get('ref');
+    if (refCode) {
+      setSponsorCode(refCode);
+      toast.success(`Referral code ${refCode} applied!`);
+      // Auto-verify the sponsor code
+      verifyReferralCode(refCode);
+    }
+  }, [searchParams]);
+
+  // Function to verify referral code
+  const verifyReferralCode = async (code: string) => {
+    if (!code) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api<{ full_name: string; referral_code: string }>(`/api/auth/sponsor/${encodeURIComponent(code)}`);
+      setSponsorName(res.full_name);
+    } catch (err) {
+      setSponsorName(null);
+      // Don't show error automatically, let user try again
+    } finally {
+      setLoading(false);
+    }
+  };
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
