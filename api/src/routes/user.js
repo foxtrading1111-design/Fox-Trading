@@ -150,10 +150,17 @@ userRouter.get('/dashboard', async (req, res) => {
             }
         });
 
-        // Total withdrawals (all debits)
+        // Total withdrawals (only completed withdrawals)
         const totalWithdrawalAgg = await prisma.transactions.aggregate({
             _sum: { amount: true },
-            where: { user_id: userId, type: 'debit' }
+            where: { 
+                user_id: userId, 
+                OR: [
+                    { type: 'debit', income_source: { in: ['withdrawal', 'income_withdrawal', 'investment_withdrawal'] } },
+                    { type: 'WITHDRAWAL' }
+                ],
+                status: 'COMPLETED'
+            }
         });
 
         // Calculate today's investment profit
