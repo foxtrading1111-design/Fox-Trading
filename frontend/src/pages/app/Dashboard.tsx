@@ -28,6 +28,7 @@ import { api } from '@/lib/api';
 const Dashboard: React.FC = () => {
   const [showBalance, setShowBalance] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [copiedItem, setCopiedItem] = useState<string | null>(null);
   const { data, loading, error } = useDashboardData();
   
   // Fetch additional income data
@@ -108,8 +109,6 @@ const Dashboard: React.FC = () => {
     teamIncome: Number(teamIncomeData?.totalTeamIncome || 0),
     todayWithdrawal: Number(todayWithdrawalData?.totalTodayWithdrawal || 0)
   };
-
-  const [copiedItem, setCopiedItem] = React.useState<string | null>(null);
 
   const copyToClipboard = (text: string, itemName: string) => {
     navigator.clipboard.writeText(text);
