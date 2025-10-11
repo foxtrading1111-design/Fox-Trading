@@ -237,10 +237,16 @@ adminRouter.post('/deposits/approve/:transactionId', async (req, res) => {
         throw new Error('Pending transaction not found');
       }
 
-      // 2. Update transaction status to COMPLETED
+      // 2. Update transaction status to COMPLETED and set 6-month unlock date for deposits
+      const unlockDate = new Date();
+      unlockDate.setMonth(unlockDate.getMonth() + 6); // 6 months lock for deposits
+      
       await prisma.transactions.update({
         where: { id: transactionId },
-        data: { status: 'COMPLETED' },
+        data: { 
+          status: 'COMPLETED',
+          unlock_date: unlockDate // Deposits are locked for 6 months
+        },
       });
 
       // 3. Get or create user's wallet
@@ -314,7 +320,9 @@ adminRouter.post('/deposits/approve/:transactionId', async (req, res) => {
                 type: 'credit',
                 income_source: incomeSource,
                 description: description,
-                status: 'COMPLETED'
+                status: 'COMPLETED',
+                unlock_date: new Date(), // Income is immediately withdrawable
+                referral_level: level + 1 // Track referral level
               },
             });
             
