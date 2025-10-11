@@ -30,25 +30,21 @@ export default function RegisterPage() {
       setSponsorCode(refCode);
       toast.success(`Referral code ${refCode} applied!`);
       // Auto-verify the sponsor code
-      verifyReferralCode(refCode);
+      setLoading(true);
+      setError(null);
+      api<{ full_name: string; referral_code: string }>(`/api/auth/sponsor/${encodeURIComponent(refCode)}`)
+        .then(res => {
+          setSponsorName(res.full_name);
+        })
+        .catch(() => {
+          // Don't show error automatically, let user try again
+          setSponsorName(null);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
     }
   }, [searchParams]);
-
-  // Function to verify referral code
-  const verifyReferralCode = async (code: string) => {
-    if (!code) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api<{ full_name: string; referral_code: string }>(`/api/auth/sponsor/${encodeURIComponent(code)}`);
-      setSponsorName(res.full_name);
-    } catch (err) {
-      setSponsorName(null);
-      // Don't show error automatically, let user try again
-    } finally {
-      setLoading(false);
-    }
-  };
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
