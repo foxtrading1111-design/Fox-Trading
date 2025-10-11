@@ -85,13 +85,15 @@ userRouter.get('/dashboard', async (req, res) => {
             select: { full_name: true, email: true, referral_code: true, created_at: true }
         });
 
-        // Get total deposited amount only (for total balance display)
+        // Get total deposited amount (for investment tracking)
         const depositedAmountAgg = await prisma.transactions.aggregate({
             _sum: { amount: true }, 
             where: { 
                 user_id: userId, 
-                type: 'credit',
-                income_source: 'investment_deposit',
+                OR: [
+                    { type: 'DEPOSIT', status: 'COMPLETED' },
+                    { type: 'credit', income_source: { endsWith: '_deposit' } }
+                ],
                 status: 'COMPLETED'
             },
         });
@@ -117,7 +119,7 @@ userRouter.get('/dashboard', async (req, res) => {
             where: { user_id: userId, type: 'credit', status: 'COMPLETED' },
         });
 
-        // Daily income display - just show "daily income" label (as requested)
+        // Daily income - only income earned today (exclude deposits)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
@@ -128,7 +130,11 @@ userRouter.get('/dashboard', async (req, res) => {
             where: {
                 user_id: userId,
                 type: 'credit',
-                timestamp: { gte: today, lt: tomorrow }
+                timestamp: { gte: today, lt: tomorrow },
+                income_source: { 
+                    in: ['direct_income', 'team_income', 'salary_income', 'daily_profit', 'monthly_profit']
+                },
+                status: 'COMPLETED'
             }
         });
 
@@ -234,9 +240,9 @@ userRouter.get('/dashboard', async (req, res) => {
             
             // Financial data
             total_investment: depositedAmountAgg._sum.amount ?? 0, // Total deposited amount
-            wallet_balance: depositedAmountAgg._sum.amount ?? 0, // Show only deposited amount as total balance
-            daily_income: dailyIncomeAgg._sum.amount ?? 0, // Today's income
-            total_income: totalIncomeAgg._sum.amount ?? 0, // Income from all sources (referral, team, salary)
+            wallet_balance: Number(wallet.balance) ?? 0, // Total wallet balance (deposits + income - withdrawals)
+            daily_income: dailyIncomeAgg._sum.amount ?? 0, // Today's income (only from income sources, not deposits)
+            total_income: totalIncomeAgg._sum.amount ?? 0, // Total lifetime income from all sources (referral, team, salary)
             total_withdrawal: totalWithdrawalAgg._sum.amount ?? 0,
             today_investment_profit: todayInvestmentProfit,
             total_investment_profit: totalInvestmentProfit,
