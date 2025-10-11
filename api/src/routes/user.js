@@ -1097,25 +1097,65 @@ userRouter.get('/wallet-balance', async (req, res) => {
     const userId = req.user.id;
     
     try {
-        // Get wallet balance
-        const wallet = await prisma.wallets.findUnique({
-            where: { user_id: userId }
+        // Get total deposits (for Total Balance)
+        const totalDeposits = await prisma.transactions.aggregate({
+            _sum: { amount: true },
+            where: {
+                user_id: userId,
+                OR: [
+                    { type: 'DEPOSIT', status: 'COMPLETED' },
+                    { type: 'credit', income_source: { endsWith: '_deposit' } }
+                ],
+                status: 'COMPLETED'
+            }
         });
         
-        // Get pending withdrawals (locked balance)
-        const pendingWithdrawals = await prisma.transactions.aggregate({
+        // Get locked deposits (6-month lock)
+        const lockedDeposits = await prisma.transactions.aggregate({
+            _sum: { amount: true },
+            where: {
+                user_id: userId,
+                type: 'credit',
+                income_source: { endsWith: '_deposit' },
+                unlock_date: { gt: new Date() }, // Still locked
+                status: 'COMPLETED'
+            }
+        });
+        
+        // Get withdrawable income (unlocked)
+        const withdrawableIncome = await prisma.transactions.aggregate({
+            _sum: { amount: true },
+            where: {
+                user_id: userId,
+                type: 'credit',
+                unlock_date: { lte: new Date() }, // Unlocked
+                OR: [
+                    { income_source: 'direct_income' },
+                    { income_source: 'team_income' },
+                    { income_source: 'salary_income' },
+                    { income_source: 'monthly_profit' },
+                    { income_source: { contains: 'income' } }
+                ],
+                status: 'COMPLETED'
+            }
+        });
+        
+        // Get already withdrawn amounts
+        const totalWithdrawn = await prisma.transactions.aggregate({
             _sum: { amount: true },
             where: {
                 user_id: userId,
                 type: 'debit',
-                status: 'PENDING',
-                income_source: 'WITHDRAWAL'
+                income_source: { in: ['withdrawal', 'income_withdrawal'] },
+                status: { in: ['COMPLETED', 'PENDING'] }
             }
         });
         
-        const totalBalance = parseFloat(wallet?.balance.toString() || '0');
-        const lockedBalance = parseFloat(pendingWithdrawals._sum.amount?.toString() || '0');
-        const withdrawableBalance = Math.max(0, totalBalance - lockedBalance);
+        const totalBalance = parseFloat(totalDeposits._sum.amount?.toString() || '0');
+        const lockedBalance = parseFloat(lockedDeposits._sum.amount?.toString() || '0');
+        const totalWithdrawableIncome = parseFloat(withdrawableIncome._sum.amount?.toString() || '0');
+        const totalWithdrawnAmount = parseFloat(totalWithdrawn._sum.amount?.toString() || '0');
+        const withdrawableBalance = Math.max(0, totalWithdrawableIncome - totalWithdrawnAmount);
         
         const withdrawalFee = 1.00; // $1 per transaction
         const minWithdrawal = 10.00; // Minimum withdrawal amount
@@ -1123,9 +1163,9 @@ userRouter.get('/wallet-balance', async (req, res) => {
         return res.json({
             success: true,
             balance: {
-                total: totalBalance,
-                withdrawable: withdrawableBalance,
-                locked: lockedBalance,
+                total: totalBalance, // Total deposits
+                withdrawable: withdrawableBalance, // Withdrawable income (after withdrawals)
+                locked: lockedBalance, // Locked deposits (6-month lock)
                 withdrawalFee: withdrawalFee,
                 minWithdrawal: minWithdrawal,
                 netWithdrawable: Math.max(0, withdrawableBalance - withdrawalFee)
