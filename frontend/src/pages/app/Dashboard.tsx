@@ -251,7 +251,7 @@ const Dashboard: React.FC = () => {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="text-lg sm:text-xl lg:text-2xl font-bold text-green-500">
-              ${userStats.dailyIncome.toLocaleString()}
+              ${userStats.dailyIncome.toFixed(2)}
             </div>
             <div className="text-xs text-muted-foreground mt-1">
               Includes daily profit
