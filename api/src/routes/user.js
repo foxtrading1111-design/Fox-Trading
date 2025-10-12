@@ -238,6 +238,10 @@ userRouter.get('/dashboard', async (req, res) => {
             }
         });
 
+        // Calculate daily income including today's expected investment profit
+        const dailyIncomeFromTransactions = Number(dailyIncomeAgg._sum.amount || 0);
+        const totalDailyIncome = dailyIncomeFromTransactions + todayInvestmentProfit;
+        
         return res.json({
             // User info
             user_name: user?.full_name ?? 'N/A',
@@ -248,7 +252,7 @@ userRouter.get('/dashboard', async (req, res) => {
             // Financial data
             total_investment: depositedAmountAgg._sum.amount ?? 0, // Total deposited amount (for tracking)
             wallet_balance: depositedAmountAgg._sum.amount ?? 0, // Total Balance = Amount deposited through website
-            daily_income: dailyIncomeAgg._sum.amount ?? 0, // Today's income (only from income sources, not deposits)
+            daily_income: totalDailyIncome, // Today's income including daily profit (both from transactions and expected profit)
             total_income: totalIncomeAgg._sum.amount ?? 0, // Total lifetime income from all sources (referral, team, salary)
             total_withdrawal: totalWithdrawalAgg._sum.amount ?? 0,
             today_investment_profit: todayInvestmentProfit,
@@ -552,6 +556,44 @@ userRouter.get('/salary-status', async (req, res) => {
         // Get all downline IDs (direct and indirect)
         const downlineIds = await getDownlineIds(directChildren.map(c => c.id));
         
+        // Get left and right leg users separately
+        const leftLegUsers = await prisma.users.findMany({
+            where: { sponsor_id: userId, position: 'LEFT' },
+            select: { id: true }
+        });
+        
+        const rightLegUsers = await prisma.users.findMany({
+            where: { sponsor_id: userId, position: 'RIGHT' },
+            select: { id: true }
+        });
+        
+        const leftLegIds = await getDownlineIds(leftLegUsers.map(u => u.id));
+        const rightLegIds = await getDownlineIds(rightLegUsers.map(u => u.id));
+        
+        // Calculate left leg volume
+        const leftLegVolumeAgg = await prisma.transactions.aggregate({
+            _sum: { amount: true },
+            where: { 
+                user_id: { in: leftLegIds },
+                OR: [
+                    { type: 'DEPOSIT', status: 'COMPLETED' },
+                    { type: 'credit', income_source: { endsWith: '_deposit' } }
+                ]
+            }
+        });
+        
+        // Calculate right leg volume
+        const rightLegVolumeAgg = await prisma.transactions.aggregate({
+            _sum: { amount: true },
+            where: { 
+                user_id: { in: rightLegIds },
+                OR: [
+                    { type: 'DEPOSIT', status: 'COMPLETED' },
+                    { type: 'credit', income_source: { endsWith: '_deposit' } }
+                ]
+            }
+        });
+        
         // Calculate total downline volume (use completed deposits)
         const volumeAgg = await prisma.transactions.aggregate({ 
             _sum: { amount: true }, 
@@ -564,30 +606,58 @@ userRouter.get('/salary-status', async (req, res) => {
             } 
         });
 
-        const totalVolume = volumeAgg._sum.amount ?? 0;
+        const totalVolume = Number(volumeAgg._sum.amount || 0);
+        const leftLegVolume = Number(leftLegVolumeAgg._sum.amount || 0);
+        const rightLegVolume = Number(rightLegVolumeAgg._sum.amount || 0);
         
-        // Updated ranks based on total volume thresholds
+        // Ranks require BOTH legs to meet minimum threshold
+        // To qualify for a rank, both left and right legs must have the required volume
         const ranks = [
-            { name: 'Rank 1', threshold: 5000, salary: 100 },
-            { name: 'Rank 2', threshold: 15000, salary: 250 },
-            { name: 'Rank 3', threshold: 50000, salary: 500 },
-            { name: 'Rank 4', threshold: 80000, salary: 750 },
-            { name: 'Rank 5', threshold: 100000, salary: 1000 },
+            { name: 'Rank 1', threshold: 5000, salary: 100 },      // Each leg needs $5,000
+            { name: 'Rank 2', threshold: 15000, salary: 250 },     // Each leg needs $15,000
+            { name: 'Rank 3', threshold: 50000, salary: 500 },     // Each leg needs $50,000
+            { name: 'Rank 4', threshold: 80000, salary: 750 },     // Each leg needs $80,000
+            { name: 'Rank 5', threshold: 100000, salary: 1000 },   // Each leg needs $100,000
         ];
         
-        const progress = ranks.map(r => ({
-            rankName: r.name,
-            threshold: r.threshold,
-            salary: r.salary,
-            isAchieved: totalVolume >= r.threshold,
-            progress: Math.min(1, totalVolume / r.threshold),
-            volumeNeeded: Math.max(0, r.threshold - totalVolume)
-        }));
+        // Calculate progress for each rank based on BOTH legs meeting requirement
+        const progress = ranks.map(r => {
+            const leftMeetsRequirement = leftLegVolume >= r.threshold;
+            const rightMeetsRequirement = rightLegVolume >= r.threshold;
+            const isAchieved = leftMeetsRequirement && rightMeetsRequirement;
+            
+            // Progress is based on the weaker leg
+            const weakerLeg = Math.min(leftLegVolume, rightLegVolume);
+            const progressValue = Math.min(1, weakerLeg / r.threshold);
+            
+            // Volume needed is for the weaker leg
+            const leftNeeded = Math.max(0, r.threshold - leftLegVolume);
+            const rightNeeded = Math.max(0, r.threshold - rightLegVolume);
+            
+            return {
+                rankName: r.name,
+                threshold: r.threshold,
+                salary: r.salary,
+                isAchieved,
+                progress: progressValue,
+                volumeNeeded: Math.max(leftNeeded, rightNeeded),
+                leftLegVolume,
+                rightLegVolume,
+                leftNeeded,
+                rightNeeded,
+                requirementMet: {
+                    left: leftMeetsRequirement,
+                    right: rightMeetsRequirement
+                }
+            };
+        });
         
         const current = progress.slice().reverse().find(p => p.isAchieved) ?? null;
         
         return res.json({ 
             totalVolume, 
+            leftLegVolume,
+            rightLegVolume,
             directReferrals: directChildren.length,
             totalDownline: downlineIds.length,
             ranks: progress, 
