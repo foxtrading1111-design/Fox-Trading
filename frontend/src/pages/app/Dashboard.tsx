@@ -219,6 +219,26 @@ const Dashboard: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Daily Profit Highlight Card */}
+      <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-yellow-500/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+            <TrendingUp size={18} className="text-amber-500" />
+            Daily Investment Profit
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">0.333% per day (10% monthly)</p>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="text-3xl sm:text-4xl font-bold text-amber-500 mb-2">
+            ${userStats.todayInvestmentProfit.toFixed(2)}
+          </div>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Total Earned: ${userStats.totalInvestmentProfit.toFixed(2)}</span>
+            <Badge variant="outline" className="border-amber-500/50 text-amber-500">Auto-credited</Badge>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Income & Withdrawal Section */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
         {/* Daily Income */}
@@ -232,6 +252,9 @@ const Dashboard: React.FC = () => {
           <CardContent className="pt-0">
             <div className="text-lg sm:text-xl lg:text-2xl font-bold text-green-500">
               ${userStats.dailyIncome.toLocaleString()}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Includes daily profit
             </div>
           </CardContent>
         </Card>

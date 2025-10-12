@@ -1614,6 +1614,22 @@ userRouter.post('/admin/distribute-monthly-profits', async (req, res) => {
     }
 });
 
+// Admin endpoint to manually trigger daily profit distribution
+userRouter.post('/admin/distribute-daily-profits', async (req, res) => {
+    try {
+        if (req.user.role !== 'ADMIN') {
+            return res.status(403).json({ error: 'Admin access required' });
+        }
+        
+        const { processDailyProfitDistribution } = await import('../services/dailyProfitDistribution.js');
+        const result = await processDailyProfitDistribution();
+        return res.json(result);
+    } catch (error) {
+        console.error('Manual daily profit distribution error:', error);
+        return res.status(500).json({ error: 'Failed to distribute daily profits' });
+    }
+});
+
 // Admin endpoint to manually trigger team income distribution (legacy)
 userRouter.post('/admin/distribute-team-income', async (req, res) => {
     try {
