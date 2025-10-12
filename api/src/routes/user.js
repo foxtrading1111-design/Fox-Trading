@@ -132,21 +132,23 @@ userRouter.get('/dashboard', async (req, res) => {
                 type: 'credit',
                 timestamp: { gte: today, lt: tomorrow },
                 income_source: { 
-                    in: ['direct_income', 'team_income', 'salary_income', 'daily_profit', 'monthly_profit']
+                    not: { endsWith: '_deposit' } // Exclude all deposit sources, include ALL income sources
                 },
                 status: 'COMPLETED'
             }
         });
 
-        // Total income from all sources (referral, team, salary, monthly profit) - exclude deposits
+        // Total income from all sources - exclude deposits only
+        // This includes: direct_income, team_income, salary_income, daily_profit, monthly_profit, referral_income, etc.
         const totalIncomeAgg = await prisma.transactions.aggregate({
             _sum: { amount: true },
             where: { 
                 user_id: userId, 
                 type: 'credit',
                 income_source: { 
-                    in: ['direct_income', 'team_income', 'salary_income', 'daily_profit', 'monthly_profit']
-                }
+                    not: { endsWith: '_deposit' } // Exclude all deposit sources, include ALL income sources
+                },
+                status: 'COMPLETED'
             }
         });
 

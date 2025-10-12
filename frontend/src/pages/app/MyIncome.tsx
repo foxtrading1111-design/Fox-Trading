@@ -91,25 +91,29 @@ const MyIncome: React.FC = () => {
 
   const getIncomeSourceColor = (source: string) => {
     const colors: { [key: string]: string } = {
-      trading_bonus: '#3b82f6',
-      team_income: '#10b981',
-      direct_income: '#f59e0b',
-      salary_income: '#8b5cf6',
-      daily_profit: '#ef4444',
-      binary_bonus: '#06b6d4',
-      level_income: '#84cc16',
-      matching_bonus: '#ec4899',
+      referral_income: '#22c55e',      // Bright green for referral
+      trading_bonus: '#3b82f6',        // Blue
+      team_income: '#10b981',          // Green
+      direct_income: '#f59e0b',        // Orange
+      salary_income: '#8b5cf6',        // Purple
+      daily_profit: '#ef4444',         // Red
+      monthly_profit: '#f97316',       // Orange-red
+      binary_bonus: '#06b6d4',         // Cyan
+      level_income: '#84cc16',         // Lime
+      matching_bonus: '#ec4899',       // Pink
     };
     return colors[source] || '#6b7280';
   };
 
   const getIncomeSourceName = (source: string) => {
     const names: { [key: string]: string } = {
+      referral_income: 'Referral Income',
       trading_bonus: 'Trading Bonus',
       team_income: 'Team Income (Multi-Level)',
       direct_income: 'Direct Income (One-time)',
       salary_income: 'Salary Income',
       daily_profit: 'Daily Investment Profit',
+      monthly_profit: 'Monthly Investment Profit',
       binary_bonus: 'Binary Bonus',
       level_income: 'Level Income',
       matching_bonus: 'Matching Bonus',

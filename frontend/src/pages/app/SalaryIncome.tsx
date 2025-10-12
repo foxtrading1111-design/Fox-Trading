@@ -206,24 +206,24 @@ const SalaryIncome: React.FC = () => {
 
       {/* Next Rank Progress */}
       {nextRankData && (
-        <Card className="border-2 border-yellow-200 bg-yellow-50">
+        <Card className="border-2 border-yellow-400 bg-yellow-50">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
+            <CardTitle className="flex items-center space-x-2 text-gray-900">
               <ArrowUp className="h-5 w-5 text-yellow-600" />
               <span>Next Rank Progress</span>
             </CardTitle>
-            <CardDescription>You're working towards {nextRankData.rankName}</CardDescription>
+            <CardDescription className="text-gray-700">You're working towards {nextRankData.rankName}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-semibold text-lg">{nextRankData.rankName}</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="font-semibold text-lg text-gray-900">{nextRankData.rankName}</p>
+                <p className="text-sm text-gray-700">
                   Monthly Salary: {formatCurrency(nextRankData.salary)}
                 </p>
               </div>
               <Badge 
-                className="text-lg px-4 py-2"
+                className="text-lg px-4 py-2 text-white"
                 style={{ backgroundColor: getRankColor(nextRankData.rankName) }}
               >
                 +{formatCurrency(nextRankData.salary - (currentRankData?.salary || 0))}
@@ -231,8 +231,8 @@ const SalaryIncome: React.FC = () => {
             </div>
             
             <div className="space-y-3">
-              <div className="p-3 bg-white rounded-lg border">
-                <p className="text-sm font-semibold mb-2">Required Per Leg: {formatVolume(nextRankData.threshold)}</p>
+              <div className="p-3 bg-white rounded-lg border-2 border-gray-300">
+                <p className="text-sm font-bold mb-3 text-gray-900">Required Per Leg: {formatVolume(nextRankData.threshold)}</p>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className={`p-3 rounded-lg ${nextRankData.requirementMet?.left ? 'bg-green-100 text-green-800 border-2 border-green-400' : 'bg-gray-50 text-gray-800 border-2 border-gray-300'}`}>
                     <div className="font-semibold mb-1">Left Leg</div>
@@ -257,8 +257,8 @@ const SalaryIncome: React.FC = () => {
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm font-medium">
+              <div className="space-y-2 p-3 bg-white rounded-lg border">
+                <div className="flex justify-between text-sm font-semibold text-gray-900">
                   <span>Progress (Based on Weaker Leg)</span>
                   <span>{Math.round(nextRankData.progress * 100)}%</span>
                 </div>
@@ -309,8 +309,8 @@ const SalaryIncome: React.FC = () => {
                   
                   <div className="space-y-3">
                     <div className="text-sm space-y-2">
-                      <p className="text-muted-foreground font-semibold">Required Per Leg:</p>
-                      <p className="font-medium">{formatVolume(rank.threshold)}</p>
+                      <p className="text-gray-700 font-bold">Required Per Leg:</p>
+                      <p className="font-bold text-base text-gray-900">{formatVolume(rank.threshold)}</p>
                       
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className={`p-2 rounded ${rank.requirementMet?.left ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-gray-100 text-gray-800 border border-gray-300'}`}>
@@ -332,9 +332,9 @@ const SalaryIncome: React.FC = () => {
                     
                     {!rank.isAchieved && (
                       <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Progress (Weaker Leg)</span>
-                          <span>{Math.round(rank.progress * 100)}%</span>
+                        <div className="flex justify-between text-sm font-medium">
+                          <span className="text-gray-700">Progress (Weaker Leg)</span>
+                          <span className="text-gray-900">{Math.round(rank.progress * 100)}%</span>
                         </div>
                         <Progress value={rank.progress * 100} className="h-2" />
                       </div>
