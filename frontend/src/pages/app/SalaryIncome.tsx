@@ -230,22 +230,40 @@ const SalaryIncome: React.FC = () => {
               </Badge>
             </div>
             
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Progress to {nextRankData.rankName}</span>
-                <span>{Math.round(nextRankData.progress * 100)}%</span>
+            <div className="space-y-3">
+              <div className="p-3 bg-white rounded-lg border">
+                <p className="text-sm font-semibold mb-2">Required Per Leg: {formatVolume(nextRankData.threshold)}</p>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className={`p-3 rounded-lg ${nextRankData.requirementMet?.left ? 'bg-green-100 text-green-800 border-2 border-green-400' : 'bg-gray-50 text-gray-800 border-2 border-gray-300'}`}>
+                    <div className="font-semibold mb-1">Left Leg</div>
+                    <div className="text-lg font-bold">{formatVolume(nextRankData.leftLegVolume)}</div>
+                    {!nextRankData.requirementMet?.left && nextRankData.leftNeeded > 0 && (
+                      <div className="text-xs text-red-600 font-semibold mt-2">Need: {formatVolume(nextRankData.leftNeeded)}</div>
+                    )}
+                    {nextRankData.requirementMet?.left && (
+                      <div className="text-xs text-green-600 font-semibold mt-2">✓ Met</div>
+                    )}
+                  </div>
+                  <div className={`p-3 rounded-lg ${nextRankData.requirementMet?.right ? 'bg-green-100 text-green-800 border-2 border-green-400' : 'bg-gray-50 text-gray-800 border-2 border-gray-300'}`}>
+                    <div className="font-semibold mb-1">Right Leg</div>
+                    <div className="text-lg font-bold">{formatVolume(nextRankData.rightLegVolume)}</div>
+                    {!nextRankData.requirementMet?.right && nextRankData.rightNeeded > 0 && (
+                      <div className="text-xs text-red-600 font-semibold mt-2">Need: {formatVolume(nextRankData.rightNeeded)}</div>
+                    )}
+                    {nextRankData.requirementMet?.right && (
+                      <div className="text-xs text-green-600 font-semibold mt-2">✓ Met</div>
+                    )}
+                  </div>
+                </div>
               </div>
-              <Progress value={nextRankData.progress * 100} className="h-3" />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Current: {formatVolume(salaryData?.totalVolume || 0)}</span>
-                <span>Target: {formatVolume(nextRankData.threshold)}</span>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm font-medium">
+                  <span>Progress (Based on Weaker Leg)</span>
+                  <span>{Math.round(nextRankData.progress * 100)}%</span>
+                </div>
+                <Progress value={nextRankData.progress * 100} className="h-3" />
               </div>
-            </div>
-            
-            <div className="p-3 bg-white rounded-lg border">
-              <p className="text-sm">
-                <strong>Need {formatVolume(nextRankData.volumeNeeded)} more</strong> in team business volume to reach {nextRankData.rankName}
-              </p>
             </div>
           </CardContent>
         </Card>
@@ -295,18 +313,18 @@ const SalaryIncome: React.FC = () => {
                       <p className="font-medium">{formatVolume(rank.threshold)}</p>
                       
                       <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className={`p-2 rounded ${rank.requirementMet?.left ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}>
+                        <div className={`p-2 rounded ${rank.requirementMet?.left ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-gray-100 text-gray-800 border border-gray-300'}`}>
                           <div className="font-medium">Left Leg</div>
-                          <div>{formatVolume(rank.leftLegVolume)}</div>
+                          <div className="font-semibold">{formatVolume(rank.leftLegVolume)}</div>
                           {!rank.requirementMet?.left && rank.leftNeeded > 0 && (
-                            <div className="text-xs text-red-600">Need: {formatVolume(rank.leftNeeded)}</div>
+                            <div className="text-xs text-red-600 font-medium mt-1">Need: {formatVolume(rank.leftNeeded)}</div>
                           )}
                         </div>
-                        <div className={`p-2 rounded ${rank.requirementMet?.right ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}>
+                        <div className={`p-2 rounded ${rank.requirementMet?.right ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-gray-100 text-gray-800 border border-gray-300'}`}>
                           <div className="font-medium">Right Leg</div>
-                          <div>{formatVolume(rank.rightLegVolume)}</div>
+                          <div className="font-semibold">{formatVolume(rank.rightLegVolume)}</div>
                           {!rank.requirementMet?.right && rank.rightNeeded > 0 && (
-                            <div className="text-xs text-red-600">Need: {formatVolume(rank.rightNeeded)}</div>
+                            <div className="text-xs text-red-600 font-medium mt-1">Need: {formatVolume(rank.rightNeeded)}</div>
                           )}
                         </div>
                       </div>
