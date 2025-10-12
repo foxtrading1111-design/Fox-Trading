@@ -20,6 +20,8 @@ import {
 
 type SalaryStatus = {
   totalVolume: number;
+  leftLegVolume: number;
+  rightLegVolume: number;
   directReferrals: number;
   totalDownline: number;
   currentRank: string | null;
@@ -29,7 +31,15 @@ type SalaryStatus = {
     salary: number; 
     isAchieved: boolean; 
     progress: number; 
-    volumeNeeded: number 
+    volumeNeeded: number;
+    leftLegVolume: number;
+    rightLegVolume: number;
+    leftNeeded: number;
+    rightNeeded: number;
+    requirementMet: {
+      left: boolean;
+      right: boolean;
+    }
   }>;
 };
 
@@ -280,21 +290,35 @@ const SalaryIncome: React.FC = () => {
                   </div>
                   
                   <div className="space-y-3">
-                    <div className="text-sm">
-                      <p className="text-muted-foreground">Required Volume:</p>
+                    <div className="text-sm space-y-2">
+                      <p className="text-muted-foreground font-semibold">Required Per Leg:</p>
                       <p className="font-medium">{formatVolume(rank.threshold)}</p>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className={`p-2 rounded ${rank.requirementMet?.left ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}>
+                          <div className="font-medium">Left Leg</div>
+                          <div>{formatVolume(rank.leftLegVolume)}</div>
+                          {!rank.requirementMet?.left && rank.leftNeeded > 0 && (
+                            <div className="text-xs text-red-600">Need: {formatVolume(rank.leftNeeded)}</div>
+                          )}
+                        </div>
+                        <div className={`p-2 rounded ${rank.requirementMet?.right ? 'bg-green-100 text-green-700' : 'bg-gray-100'}`}>
+                          <div className="font-medium">Right Leg</div>
+                          <div>{formatVolume(rank.rightLegVolume)}</div>
+                          {!rank.requirementMet?.right && rank.rightNeeded > 0 && (
+                            <div className="text-xs text-red-600">Need: {formatVolume(rank.rightNeeded)}</div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     
                     {!rank.isAchieved && (
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Progress</span>
+                          <span className="text-muted-foreground">Progress (Weaker Leg)</span>
                           <span>{Math.round(rank.progress * 100)}%</span>
                         </div>
                         <Progress value={rank.progress * 100} className="h-2" />
-                        <p className="text-xs text-muted-foreground">
-                          Need {formatVolume(rank.volumeNeeded)} more
-                        </p>
                       </div>
                     )}
                     
