@@ -1577,16 +1577,39 @@ userRouter.get('/dashboard/total-withdrawal', async (req, res) => {
     }
 });
 
-// Withdrawal eligibility check - implements 6-month lock for deposits
+// Withdrawal eligibility check - calculates from actual transactions
 userRouter.get('/withdrawal/eligibility', async (req, res) => {
     const userId = req.user.id;
     try {
-        // Get wallet balance (this contains all withdrawable income)
-        const wallet = await prisma.wallets.findUnique({
-            where: { user_id: userId }
+        // Calculate total income from all transactions (excluding deposits)
+        const totalIncomeAgg = await prisma.transactions.aggregate({
+            _sum: { amount: true },
+            where: { 
+                user_id: userId, 
+                type: 'credit',
+                income_source: { 
+                    not: { endsWith: '_deposit' }
+                },
+                status: 'COMPLETED'
+            }
         });
         
-        const totalWalletBalance = Number(wallet?.balance || 0);
+        const totalIncome = Number(totalIncomeAgg._sum.amount || 0);
+        
+        // Get completed withdrawals
+        const completedWithdrawalsAgg = await prisma.transactions.aggregate({
+            _sum: { amount: true },
+            where: {
+                user_id: userId,
+                OR: [
+                    { type: 'debit', income_source: { in: ['withdrawal', 'income_withdrawal', 'investment_withdrawal'] } },
+                    { type: 'WITHDRAWAL' }
+                ],
+                status: 'COMPLETED'
+            }
+        });
+        
+        const completedWithdrawals = Number(completedWithdrawalsAgg._sum.amount || 0);
         
         // Get locked deposits (investment deposits with unlock_date in future)
         const lockedDeposits = await prisma.transactions.aggregate({
@@ -1628,15 +1651,20 @@ userRouter.get('/withdrawal/eligibility', async (req, res) => {
         
         const pendingAmount = Number(pendingWithdrawals._sum.amount || 0);
         
-        // Withdrawable balance = wallet balance (income) + unlocked deposits - pending withdrawals
-        const withdrawableBalance = Math.max(0, totalWalletBalance + unlockedDepositAmount - pendingAmount);
+        // Available balance = total income - completed withdrawals
+        const availableIncomeBalance = totalIncome - completedWithdrawals;
+        
+        // Withdrawable balance = available income + unlocked deposits - pending withdrawals
+        const withdrawableBalance = Math.max(0, availableIncomeBalance + unlockedDepositAmount - pendingAmount);
         
         const withdrawalFee = 1.00;
         const minWithdrawal = 10.00;
         const maxWithdrawalPerDay = withdrawableBalance; // No daily limit
         
         return res.json({
-            totalWalletBalance,        // Income balance (always withdrawable)
+            totalIncome,               // Total income earned (all sources)
+            completedWithdrawals,      // Already withdrawn amount
+            availableIncomeBalance,    // Income balance available (total income - withdrawals)
             lockedDepositAmount,       // Locked deposits (6-month lock)
             unlockedDepositAmount,     // Unlocked deposits (can be withdrawn)
             pendingAmount,             // Pending withdrawals
