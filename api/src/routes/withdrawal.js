@@ -78,39 +78,38 @@ withdrawalRouter.post('/income', async (req, res) => {
       });
     }
     const result = await prisma.$transaction(async (prisma) => {
-      // Calculate withdrawable balance (only from unlocked income)
-      const withdrawableTransactions = await prisma.transactions.aggregate({
+      // Calculate total income from all transactions (excluding deposits)
+      const totalIncomeAgg = await prisma.transactions.aggregate({
         _sum: { amount: true },
-        where: {
-          user_id: userId,
+        where: { 
+          user_id: userId, 
           type: 'credit',
-          unlock_date: { lte: new Date() }, // Only unlocked transactions
-          OR: [
-            { income_source: 'direct_income' },
-            { income_source: 'team_income' },
-            { income_source: 'salary_income' },
-            { income_source: 'monthly_profit' },
-            { income_source: { contains: 'income' } }
-          ],
+          income_source: { 
+            not: { endsWith: '_deposit' }
+          },
           status: 'COMPLETED'
         }
       });
+      
+      const totalIncome = Number(totalIncomeAgg._sum.amount || 0);
 
-      // Get already withdrawn amounts
-      const totalWithdrawn = await prisma.transactions.aggregate({
+      // Get already withdrawn amounts (completed and pending)
+      const totalWithdrawnAgg = await prisma.transactions.aggregate({
         _sum: { amount: true },
         where: {
           user_id: userId,
-          type: 'debit',
-          income_source: { in: ['withdrawal', 'income_withdrawal'] },
+          OR: [
+            { type: 'debit', income_source: { in: ['withdrawal', 'income_withdrawal', 'investment_withdrawal'] } },
+            { type: 'WITHDRAWAL' }
+          ],
           status: { in: ['COMPLETED', 'PENDING'] }
         }
       });
+      
+      const totalWithdrawn = Number(totalWithdrawnAgg._sum.amount || 0);
 
       // Calculate available withdrawable balance
-      const totalWithdrawableIncome = withdrawableTransactions._sum.amount ? parseFloat(withdrawableTransactions._sum.amount.toString()) : 0;
-      const totalWithdrawnAmount = totalWithdrawn._sum.amount ? parseFloat(totalWithdrawn._sum.amount.toString()) : 0;
-      const availableWithdrawableBalance = Math.max(0, totalWithdrawableIncome - totalWithdrawnAmount);
+      const availableWithdrawableBalance = Math.max(0, totalIncome - totalWithdrawn);
 
       // Check if user has enough withdrawable income balance
       if (availableWithdrawableBalance < amount) {
@@ -519,44 +518,54 @@ withdrawalRouter.get('/stats', async (req, res) => {
   const userId = req.user.id;
 
   try {
-    // Get withdrawable balance (only from unlocked income transactions)
-    const withdrawableTransactions = await prisma.transactions.aggregate({
+    // Calculate total income from all transactions (excluding deposits)
+    const totalIncomeAgg = await prisma.transactions.aggregate({
       _sum: { amount: true },
-      where: {
-        user_id: userId,
+      where: { 
+        user_id: userId, 
         type: 'credit',
-        unlock_date: { lte: new Date() }, // Only unlocked transactions
-        OR: [
-          { income_source: 'direct_income' },
-          { income_source: 'team_income' },
-          { income_source: 'salary_income' },
-          { income_source: 'monthly_profit' },
-          { income_source: { contains: 'income' } }
-        ],
+        income_source: { 
+          not: { endsWith: '_deposit' }
+        },
         status: 'COMPLETED'
       }
     });
 
-    // Get already withdrawn amounts
-    const totalWithdrawn = await prisma.transactions.aggregate({
+    const totalIncome = Number(totalIncomeAgg._sum.amount || 0);
+    
+    // Get completed withdrawals
+    const completedWithdrawalsAgg = await prisma.transactions.aggregate({
+      _sum: { amount: true },
+      where: {
+        user_id: userId,
+        OR: [
+          { type: 'debit', income_source: { in: ['withdrawal', 'income_withdrawal', 'investment_withdrawal'] } },
+          { type: 'WITHDRAWAL' }
+        ],
+        status: 'COMPLETED'
+      }
+    });
+    
+    const completedWithdrawals = Number(completedWithdrawalsAgg._sum.amount || 0);
+    
+    // Get pending withdrawals
+    const pendingWithdrawalsAgg = await prisma.transactions.aggregate({
       _sum: { amount: true },
       where: {
         user_id: userId,
         type: 'debit',
-        income_source: { in: ['withdrawal', 'income_withdrawal'] },
-        status: { in: ['COMPLETED', 'PENDING'] } // Include pending to show accurate available balance
+        status: 'PENDING'
       }
     });
-
+    
+    const pendingAmount = Number(pendingWithdrawalsAgg._sum.amount || 0);
+    
     // Calculate available withdrawable balance
-    const totalWithdrawableIncome = withdrawableTransactions._sum.amount ? parseFloat(withdrawableTransactions._sum.amount.toString()) : 0;
-    const totalWithdrawnAmount = totalWithdrawn._sum.amount ? parseFloat(totalWithdrawn._sum.amount.toString()) : 0;
-    const availableWithdrawableBalance = Math.max(0, totalWithdrawableIncome - totalWithdrawnAmount);
+    const availableIncomeBalance = totalIncome - completedWithdrawals;
+    const availableWithdrawableBalance = Math.max(0, availableIncomeBalance - pendingAmount);
 
-    // Get total withdrawals (completed only)
-    const totalWithdrawals = await prisma.transactions.aggregate({
-      _sum: { amount: true },
-      _count: { id: true },
+    // Get total withdrawal count (completed only)
+    const totalWithdrawalsCount = await prisma.transactions.count({
       where: {
         user_id: userId,
         type: 'debit',
@@ -565,14 +574,11 @@ withdrawalRouter.get('/stats', async (req, res) => {
       },
     });
 
-    // Get pending withdrawals
-    const pendingWithdrawals = await prisma.transactions.aggregate({
-      _sum: { amount: true },
-      _count: { id: true },
+    // Get pending withdrawal count
+    const pendingWithdrawalsCount = await prisma.transactions.count({
       where: {
         user_id: userId,
         type: 'debit',
-        income_source: { in: ['withdrawal', 'income_withdrawal', 'investment_withdrawal'] },
         status: 'PENDING',
       },
     });
@@ -600,16 +606,15 @@ withdrawalRouter.get('/stats', async (req, res) => {
     res.json({
       success: true,
       stats: {
-        available_balance: availableWithdrawableBalance, // Only withdrawable income, not locked deposits
-        total_withdrawn: totalWithdrawals._sum.amount ? parseFloat(totalWithdrawals._sum.amount.toString()) : 0,
-        total_withdrawal_count: totalWithdrawals._count.id || 0,
-        pending_amount: pendingWithdrawals._sum.amount ? parseFloat(pendingWithdrawals._sum.amount.toString()) : 0,
-        pending_count: pendingWithdrawals._count.id || 0,
+        available_balance: availableWithdrawableBalance, // Available income after completed withdrawals and pending
+        total_income: totalIncome, // Total income earned (matches dashboard)
+        available_income_balance: availableIncomeBalance, // Income - completed withdrawals
+        total_withdrawn: completedWithdrawals,
+        total_withdrawal_count: totalWithdrawalsCount,
+        pending_amount: pendingAmount,
+        pending_count: pendingWithdrawalsCount,
         eligible_investments_count: eligibleInvestments.length,
         total_investments_count: depositTransactions.length,
-        // Additional info for debugging
-        total_withdrawable_income: totalWithdrawableIncome,
-        total_withdrawn_amount: totalWithdrawnAmount,
       },
     });
   } catch (error) {
