@@ -240,9 +240,8 @@ userRouter.get('/dashboard', async (req, res) => {
             }
         });
 
-        // Calculate daily income including today's expected investment profit
+        // Daily income from transactions (includes daily_profit transactions created by cron)
         const dailyIncomeFromTransactions = Number(dailyIncomeAgg._sum.amount || 0);
-        const totalDailyIncome = dailyIncomeFromTransactions + todayInvestmentProfit;
         
         return res.json({
             // User info
@@ -254,10 +253,10 @@ userRouter.get('/dashboard', async (req, res) => {
             // Financial data
             total_investment: depositedAmountAgg._sum.amount ?? 0, // Total deposited amount (for tracking)
             wallet_balance: depositedAmountAgg._sum.amount ?? 0, // Total Balance = Amount deposited through website
-            daily_income: totalDailyIncome, // Today's income including daily profit (both from transactions and expected profit)
-            total_income: totalIncomeAgg._sum.amount ?? 0, // Total lifetime income from all sources (referral, team, salary)
+            daily_income: dailyIncomeFromTransactions, // Today's income from all sources (includes daily_profit from cron)
+            total_income: totalIncomeAgg._sum.amount ?? 0, // Total lifetime income from all sources (referral, team, salary, daily_profit)
             total_withdrawal: totalWithdrawalAgg._sum.amount ?? 0,
-            today_investment_profit: todayInvestmentProfit,
+            today_investment_profit: todayInvestmentProfit, // Expected daily profit for reference (0.333% of deposits)
             total_investment_profit: totalInvestmentProfit,
             
             // Business data
