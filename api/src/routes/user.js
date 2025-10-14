@@ -105,18 +105,30 @@ userRouter.get('/dashboard', async (req, res) => {
             create: { user_id: userId, balance: 0 }
         });
 
-        // Get recent transactions (including pending referral income)
+        // Get recent transactions (exclude old incorrect system transactions)
         const recentTransactions = await prisma.transactions.findMany({
-            where: { user_id: userId }, 
+            where: { 
+                user_id: userId,
+                description: {
+                    not: { contains: '[OLD SYSTEM' } // Exclude old incorrect transactions
+                }
+            }, 
             orderBy: { timestamp: 'desc' }, 
             take: 20, // Increased to show more recent activity
         });
 
-        // Calculate income breakdown (including completed transactions only for totals)
+        // Calculate income breakdown (including completed transactions only for totals, exclude old system)
         const incomeBreakdown = await prisma.transactions.groupBy({
             by: ['income_source'],
             _sum: { amount: true },
-            where: { user_id: userId, type: 'credit', status: 'COMPLETED' },
+            where: { 
+                user_id: userId, 
+                type: 'credit', 
+                status: 'COMPLETED',
+                description: {
+                    not: { contains: '[OLD SYSTEM' } // Exclude old incorrect transactions
+                }
+            },
         });
 
         // Daily income - only income earned today (exclude deposits)
@@ -134,11 +146,14 @@ userRouter.get('/dashboard', async (req, res) => {
                 income_source: { 
                     not: { endsWith: '_deposit' } // Exclude all deposit sources, include ALL income sources
                 },
-                status: 'COMPLETED'
+                status: 'COMPLETED',
+                description: {
+                    not: { contains: '[OLD SYSTEM' } // Exclude old incorrect transactions
+                }
             }
         });
 
-        // Total income from all sources - exclude deposits only
+        // Total income from all sources - exclude deposits and old system transactions
         // This includes: direct_income, team_income, salary_income, daily_profit, monthly_profit, referral_income, etc.
         const totalIncomeAgg = await prisma.transactions.aggregate({
             _sum: { amount: true },
@@ -148,7 +163,10 @@ userRouter.get('/dashboard', async (req, res) => {
                 income_source: { 
                     not: { endsWith: '_deposit' } // Exclude all deposit sources, include ALL income sources
                 },
-                status: 'COMPLETED'
+                status: 'COMPLETED',
+                description: {
+                    not: { contains: '[OLD SYSTEM' } // Exclude old incorrect transactions
+                }
             }
         });
 
