@@ -38,39 +38,49 @@ const allowlist = isProduction
     ].filter(Boolean)
   : ['http://localhost:8080', 'http://localhost:3000'];
 
+// Simplified CORS configuration to ensure it works
 const corsOptions = {
-  credentials: true,
-  origin: (origin, cb) => {
-    console.log(`CORS Request from origin: ${origin}`);
+  origin: function (origin, callback) {
+    console.log(`\n=== CORS DEBUG ===");
+    console.log(`Request origin: ${origin}`);
+    console.log(`Environment: ${process.env.NODE_ENV}`);
+    console.log(`Is production: ${isProduction}`);
     console.log(`Allowed origins:`, allowlist);
     
-    // Allow server-to-server or curl (no origin)
+    // Allow requests with no origin (like mobile apps or curl)
     if (!origin) {
-      console.log('No origin header - allowing (server-to-server)');
-      return cb(null, true);
+      console.log('✅ No origin - allowing');
+      return callback(null, true);
     }
     
-    // In development, allow all origins
+    // In development, allow any origin
     if (!isProduction) {
-      console.log('Development mode - allowing all origins');
-      return cb(null, true);
+      console.log('✅ Development mode - allowing all origins');
+      return callback(null, true);
     }
     
-    // Check if origin is in allowlist
-    if (allowlist.includes(origin)) {
-      console.log(`Origin ${origin} is in allowlist - allowing`);
-      return cb(null, true);
+    // Check if the origin is in our allowlist
+    if (allowlist.indexOf(origin) !== -1) {
+      console.log(`✅ Origin ${origin} is allowed`);
+      return callback(null, true);
     }
     
-    // Log denied origins for debugging
-    console.log(`Origin ${origin} not in allowlist - denying`);
-    return cb(null, false);
+    // Deny the origin
+    console.log(`❌ Origin ${origin} is NOT allowed`);
+    return callback(new Error('Not allowed by CORS'), false);
   },
-  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','X-Requested-With'],
-  exposedHeaders: ['Content-Length', 'X-Kuma-Revision'],
-  optionsSuccessStatus: 204,
-  maxAge: 86400 // 24 hours
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With', 
+    'Content-Type', 
+    'Accept',
+    'Authorization',
+    'Cache-Control',
+    'X-HTTP-Method-Override'
+  ],
+  optionsSuccessStatus: 200 // Some legacy browsers (IE11, various SmartTVs) choke on 204
 };
 app.use(cors(corsOptions));
 // Preflight
