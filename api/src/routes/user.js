@@ -1736,16 +1736,27 @@ userRouter.post('/admin/distribute-daily-profits', async (req, res) => {
     }
 });
 
-// Admin endpoint to manually trigger team income distribution (legacy)
+// Admin endpoint to manually trigger team income distribution (DEPRECATED - DO NOT USE)
+// This endpoint uses the OLD INCORRECT logic that distributes from deposits
+// Use /admin/distribute-monthly-profits instead
 userRouter.post('/admin/distribute-team-income', async (req, res) => {
     try {
         if (req.user.role !== 'ADMIN') {
             return res.status(403).json({ error: 'Admin access required' });
         }
         
-        const { processMonthlyTeamIncome } = await import('../services/teamIncome.js');
-        const result = await processMonthlyTeamIncome();
-        return res.json(result);
+        // DISABLED - This service uses incorrect calculation logic
+        return res.status(400).json({ 
+            error: 'This endpoint is deprecated and disabled.',
+            message: 'The teamIncome service calculates income from deposits which is INCORRECT.',
+            correctEndpoint: '/admin/distribute-monthly-profits',
+            explanation: 'Referral income should be distributed from monthly profits, not deposits. Use the correct endpoint instead.'
+        });
+        
+        // OLD CODE (DISABLED):
+        // const { processMonthlyTeamIncome } = await import('../services/teamIncome.js');
+        // const result = await processMonthlyTeamIncome();
+        // return res.json(result);
     } catch (error) {
         console.error('Manual team income distribution error:', error);
         return res.status(500).json({ error: 'Failed to distribute team income' });

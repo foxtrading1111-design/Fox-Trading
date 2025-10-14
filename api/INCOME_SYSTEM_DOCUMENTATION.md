@@ -5,14 +5,14 @@ This document explains how the income distribution system works in the trading p
 
 ## Income Types
 
-### 1. Direct Income (One-Time Bonus)
-**What it is:** A one-time 10% commission when someone uses your referral code and makes their **first deposit only**.
+### 1. Direct Income (Recurring on Every Deposit)
+**What it is:** A 10% commission on **EVERY deposit** made using your referral code.
 
 **Key Points:**
-- ✅ Only triggered on the **first deposit** of a new referral
+- ✅ Triggered on **EVERY deposit** using your referral code
 - ✅ Only the **direct sponsor** (Level 1) receives this
-- ✅ Amount: **10% of the first deposit amount**
-- ❌ NOT paid on subsequent deposits
+- ✅ Amount: **10% of each deposit amount**
+- ✅ Paid every time the referred user deposits
 - ❌ NOT distributed to multiple levels
 
 **Example:**
@@ -20,21 +20,23 @@ This document explains how the income distribution system works in the trading p
 - User B makes first deposit of $1,000
 - User A (direct sponsor) receives: $100 (10% × $1,000) as **direct_income**
 - User B makes second deposit of $500
-- User A receives: $0 (direct income only on first deposit)
+- User A receives: $50 (10% × $500) as **direct_income**
+- User B makes third deposit of $2,000
+- User A receives: $200 (10% × $2,000) as **direct_income**
 
 **Implementation:** `api/src/routes/investment.js` (lines 74-113)
 
 ---
 
 ### 2. Referral Income (Monthly Recurring)
-**What it is:** A portion of YOUR OWN monthly investment profit that gets distributed UP to your sponsors/uplines.
+**What it is:** A portion of your **DOWNLINE'S monthly investment profit** that gets distributed UP through the sponsor chain.
 
 **Key Points:**
-- ✅ Based on **your OWN monthly profit** (10% of your deposits)
-- ✅ Distributed to your **upline sponsors** (up to 20 levels)
-- ✅ Calculated **monthly** when profits are generated
-- ❌ NOT based on your downline's deposits
-- ❌ NOT based on your downline's profits
+- ✅ Based on **downline members' monthly profit** (their 10% profit from deposits)
+- ✅ Distributed to **upline sponsors** (up to 20 levels)
+- ✅ Calculated **monthly** when downline members receive their profits
+- ❌ NOT based on downline's deposits (that's direct income)
+- ✅ Based on the monthly profit that downline members generate
 
 **Distribution Percentages:**
 | Level | Percentage of YOUR monthly profit |
@@ -47,16 +49,16 @@ This document explains how the income distribution system works in the trading p
 | 6-20  | 0.5% each                         |
 
 **Example:**
-- User C has $10,000 in deposits
-- Monthly profit: $1,000 (10% of deposits)
-- User C receives: $1,000 as **monthly_profit**
-- Distribution:
-  - User C's Level 1 sponsor gets: $100 (10% × $1,000) as **referral_income**
-  - User C's Level 2 sponsor gets: $50 (5% × $1,000) as **referral_income**
-  - User C's Level 3 sponsor gets: $30 (3% × $1,000) as **referral_income**
-  - User C's Level 4 sponsor gets: $20 (2% × $1,000) as **referral_income**
-  - User C's Level 5 sponsor gets: $10 (1% × $1,000) as **referral_income**
-  - User C's Level 6-20 sponsors each get: $5 (0.5% × $1,000) as **referral_income**
+- User C (in your downline) has $10,000 in deposits
+- User C's monthly profit: $1,000 (10% of their $10,000 deposits)
+- User C receives: $1,000 as **monthly_profit** (this is their own earnings)
+- That $1,000 profit is then distributed UP to sponsors:
+  - Level 1 above User C gets: $100 (10% × $1,000) as **referral_income**
+  - Level 2 above User C gets: $50 (5% × $1,000) as **referral_income**
+  - Level 3 above User C gets: $30 (3% × $1,000) as **referral_income**
+  - Level 4 above User C gets: $20 (2% × $1,000) as **referral_income**
+  - Level 5 above User C gets: $10 (1% × $1,000) as **referral_income**
+  - Levels 6-20 above User C each get: $5 (0.5% × $1,000) as **referral_income**
 
 **Implementation:** 
 - `api/src/jobs/workers.js` - `runMonthlyReferralIncome()` function
@@ -92,14 +94,13 @@ This document explains how the income distribution system works in the trading p
 ## Important Clarifications
 
 ### What Referral Income is NOT
-❌ **NOT** a commission from your downline's deposits  
-❌ **NOT** a share of your downline's profits  
-❌ **NOT** income from "team business"  
+❌ **NOT** a commission from your downline's deposits (that's direct income)  
+❌ **NOT** earned when downline deposits money  
 
 ### What Referral Income IS
-✅ **A distribution of YOUR OWN profit** to your uplines  
-✅ **Your contribution to your sponsors** for bringing you into the system  
-✅ **Calculated only from YOUR monthly earnings**
+✅ **A distribution of DOWNLINE'S monthly profit** to uplines  
+✅ **Percentage of team member's monthly earnings** distributed upward  
+✅ **Calculated from monthly profit** (10% profit on deposits), not deposits themselves
 
 ---
 
@@ -109,7 +110,7 @@ The `income_source` field in the transactions table identifies the type of incom
 
 | income_source      | Description                                           |
 |--------------------|-------------------------------------------------------|
-| `direct_income`    | One-time 10% from direct referral's first deposit    |
+| `direct_income`    | 10% from EVERY deposit using your referral code      |
 | `referral_income`  | Monthly % of downline's own profit (you as receiver) |
 | `monthly_profit`   | Your own 10% monthly investment return                |
 | `trading_bonus`    | Alternative term for monthly_profit                   |
@@ -200,7 +201,7 @@ To test the income calculations:
 ## FAQ
 
 **Q: If my referral makes a $10,000 deposit, how much do I get?**  
-A: If it's their FIRST deposit, you get $1,000 (10%) as direct_income immediately. Then each month when they receive their $1,000 monthly profit, you get $100 (10%) as referral_income.
+A: You get $1,000 (10%) as direct_income immediately, EVERY time they deposit using your code. Then each month when they receive their $1,000 monthly profit (10% of deposits), you get $100 (10% of their profit) as referral_income.
 
 **Q: Do I get income from my level 5 downline's deposits?**  
 A: No. You only get direct_income (one-time 10%) from YOUR DIRECT referrals (level 1 only). However, you DO get referral_income (monthly recurring) from up to 20 levels when they receive their monthly profits.
@@ -210,8 +211,8 @@ A: That was the old incorrect system. Those transactions are marked as [OLD SYST
 
 **Q: How is referral_income different from direct_income?**  
 A: 
-- **Direct Income:** One-time 10% bonus when someone joins using your code (first deposit only)
-- **Referral Income:** Monthly recurring % of your downline's own monthly profits (distributed to you and other uplines)
+- **Direct Income:** 10% of EVERY deposit made using your referral code (instant, recurring)
+- **Referral Income:** Monthly % of downline's monthly profits (10%, 5%, 3%, 2%, 1%, 0.5% up to 20 levels)
 
 ---
 
@@ -219,7 +220,7 @@ A:
 
 | Income Type       | Frequency  | Based On                    | Amount                | Levels    |
 |-------------------|------------|-----------------------------|------------------------|-----------|
-| Direct Income     | One-time   | Referral's first deposit    | 10% of deposit         | Level 1 only |
+| Direct Income     | Every deposit | Any deposit with your code | 10% of each deposit    | Level 1 only |
 | Referral Income   | Monthly    | Downline's monthly profit   | 10%, 5%, 3%, 2%, 1%, 0.5% | Up to 20 |
 | Monthly Profit    | Monthly    | Your own deposits           | 10% of your deposits   | Self only |
 | Salary Income     | Monthly    | Total team volume & rank    | $100-$1000 based on rank | Self only |

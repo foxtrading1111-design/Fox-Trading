@@ -71,7 +71,7 @@ investmentRouter.post('/deposit', async (req, res) => {
         },
       });
       
-      // Process ONE-TIME direct income for direct referrer only on first deposit
+      // Process DIRECT INCOME for direct referrer on FIRST deposit only
       if (user?.sponsor_id) {
         // Check if this is user's first deposit/investment
         const existingDeposits = await tx.transactions.count({
@@ -103,7 +103,7 @@ investmentRouter.post('/deposit', async (req, res) => {
                 amount: directIncomeAmount,
                 type: 'credit',
                 income_source: 'direct_income',
-                description: `One-time direct income (10%) from ${user.full_name || user.email}'s first deposit of $${amount}`,
+                description: `Direct income (10%) from ${user.full_name || user.email}'s first deposit of $${amount}`,
                 status: 'COMPLETED',
                 referral_level: 1
               },

@@ -273,67 +273,61 @@ adminRouter.post('/deposits/approve/:transactionId', async (req, res) => {
         },
       });
 
-      // 5. Process referral income for the deposit
+      // 5. Process DIRECT INCOME for first deposit only (Level 1 sponsor only)
       const user = await prisma.users.findUnique({ 
         where: { id: transaction.user_id }, 
         select: { sponsor_id: true, full_name: true, email: true } 
       });
       
       if (user?.sponsor_id) {
-        // Define referral percentages for each level
-        const referralPercentages = [
-          10,  // Level 1 (Direct sponsor) - 10%
-          5,   // Level 2 - 5% 
-          3,   // Level 3 - 3%
-        ];
-
-        let currentUserId = transaction.user_id;
-        for (let level = 0; level < referralPercentages.length; level++) {
-          const currentUser = await prisma.users.findUnique({ 
-            where: { id: currentUserId }, 
-            select: { sponsor_id: true, full_name: true } 
-          });
+        // Check if this is user's first deposit
+        const previousDeposits = await prisma.transactions.count({
+          where: {
+            user_id: transaction.user_id,
+            income_source: 'investment_deposit',
+            status: 'COMPLETED',
+            id: { not: transactionId } // Exclude current transaction
+          }
+        });
+        
+        // Only give direct income on FIRST deposit
+        if (previousDeposits === 0) {
+          const directIncomeAmount = Number((transaction.amount * 10 / 100).toFixed(2)); // 10% one-time
           
-          const sponsorId = currentUser?.sponsor_id;
-          if (!sponsorId) break; // No more sponsors in the chain
-
-          const referralAmount = Number((transaction.amount * referralPercentages[level] / 100).toFixed(2));
-          
-          if (referralAmount > 0) {
+          if (directIncomeAmount > 0) {
             // Ensure sponsor has a wallet
             await prisma.wallets.upsert({
-              where: { user_id: sponsorId },
-              create: { user_id: sponsorId, balance: referralAmount },
-              update: { balance: { increment: referralAmount } }
+              where: { user_id: user.sponsor_id },
+              create: { user_id: user.sponsor_id, balance: directIncomeAmount },
+              update: { balance: { increment: directIncomeAmount } }
             });
             
-            // Create referral income transaction
-            const incomeSource = level === 0 ? 'direct_income' : 'referral_income';
-            const description = level === 0 
-              ? `Direct income (${referralPercentages[level]}%) from ${user.full_name || user.email}'s deposit`
-              : `Level ${level + 1} referral income (${referralPercentages[level]}%) from ${user.full_name || user.email}'s deposit`;
-              
+            // Create direct income transaction
             await prisma.transactions.create({
               data: {
-                user_id: sponsorId,
-                amount: referralAmount,
+                user_id: user.sponsor_id,
+                amount: directIncomeAmount,
                 type: 'credit',
-                income_source: incomeSource,
-                description: description,
+                income_source: 'direct_income',
+                description: `Direct income (10%) from ${user.full_name || user.email}'s first deposit of $${transaction.amount}`,
                 status: 'COMPLETED',
                 unlock_date: new Date(), // Income is immediately withdrawable
-                referral_level: level + 1 // Track referral level
+                referral_level: 1
               },
             });
             
-            console.log(`💰 ${incomeSource} of $${referralAmount} added for sponsor at level ${level + 1}`);
+            console.log(`💰 Direct income of $${directIncomeAmount} added for sponsor (first deposit only)`);
           }
-          
-          currentUserId = sponsorId; // Move up the chain
+        } else {
+          console.log(`ℹ️ No direct income - not first deposit for user ${user.full_name || user.email}`);
         }
         
-        console.log(`✅ Processed referral income for deposit approval: ${user.full_name || user.email} - $${transaction.amount}`);
+        console.log(`✅ Processed direct income for deposit approval: ${user.full_name || user.email} - $${transaction.amount}`);
       }
+      
+      // NOTE: Referral income (Level 2-20) is NOT distributed from deposits.
+      // Referral income is only distributed from monthly investment profits.
+      // See workers.js runMonthlyReferralIncome() or monthlyProfitDistribution.js
 
       return { success: true };
     });

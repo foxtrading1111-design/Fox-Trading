@@ -14,11 +14,12 @@ The income distribution system had incorrect logic:
 **File:** `api/src/routes/investment.js`
 
 **What was fixed:**
-- Verified direct income is only paid on **first deposit** from direct referral
+- Changed direct income to apply on **EVERY deposit** (not just first)
+- Removed the check for "first deposit only"
 - Confirmed it's only paid to **Level 1 sponsor** (direct referrer)
-- Amount: **10% of first deposit only**
+- **Amount:** **10% of EVERY deposit using the referral code**
 
-**Status:** Already implemented correctly, no changes needed.
+**Status:** Updated to pay on every deposit.
 
 ---
 
@@ -116,17 +117,18 @@ node api/src/scripts/fix-income-data.js --recalculate
 ## Income Types (Correct Definition)
 
 ### 1. Direct Income
-- **When:** One-time, on first deposit only
+- **When:** Every deposit made using your referral code
 - **Who receives:** Direct sponsor (Level 1) only
-- **Amount:** 10% of first deposit
+- **Amount:** 10% of each deposit
 - **Source:** `direct_income`
+- **Key:** Paid EVERY time, not just first deposit
 
 ### 2. Referral Income  
-- **When:** Monthly, when user receives their monthly profit
-- **Who receives:** All sponsors up to 20 levels
-- **Amount:** 10%, 5%, 3%, 2%, 1%, 0.5% (of user's OWN monthly profit)
+- **When:** Monthly, when downline members receive their monthly profit
+- **Who receives:** All sponsors up to 20 levels above the earning member
+- **Amount:** 10%, 5%, 3%, 2%, 1%, 0.5% (of downline's monthly profit)
 - **Source:** `referral_income`
-- **Key:** Based on YOUR OWN profit, distributed UP to sponsors
+- **Key:** Based on DOWNLINE'S monthly profit, distributed UP to sponsors
 
 ### 3. Monthly Profit
 - **When:** Monthly
