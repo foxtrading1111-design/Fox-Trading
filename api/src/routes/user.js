@@ -1396,22 +1396,24 @@ userRouter.get('/dashboard/direct-income', async (req, res) => {
     }
 });
 
-// Team Income Tab - Multi-level income from team's monthly earnings
+// Referral Income Tab - Multi-level income from downline's monthly earnings
+// This is the portion of YOUR DOWNLINE's monthly profit that goes to YOU as their upline
 userRouter.get('/dashboard/team-income', async (req, res) => {
     const userId = req.user.id;
     try {
-        const teamIncomeTransactions = await prisma.transactions.findMany({
+        // Get both old 'team_income' and new 'referral_income' for backward compatibility
+        const referralIncomeTransactions = await prisma.transactions.findMany({
             where: {
                 user_id: userId,
                 type: 'credit',
-                income_source: 'team_income',
+                income_source: { in: ['team_income', 'referral_income'] },
                 status: 'COMPLETED'
             },
             orderBy: { timestamp: 'desc' }
         });
         
         // Group by level
-        const levelBreakdown = teamIncomeTransactions.reduce((acc, tx) => {
+        const levelBreakdown = referralIncomeTransactions.reduce((acc, tx) => {
             const level = tx.referral_level || 1;
             if (!acc[level]) {
                 acc[level] = { count: 0, amount: 0, transactions: [] };
@@ -1422,11 +1424,11 @@ userRouter.get('/dashboard/team-income', async (req, res) => {
             return acc;
         }, {});
         
-        const totalTeamIncome = teamIncomeTransactions.reduce(
+        const totalReferralIncome = referralIncomeTransactions.reduce(
             (sum, tx) => sum + Number(tx.amount), 0
         );
         
-        const todaysTeamIncome = teamIncomeTransactions
+        const todaysReferralIncome = referralIncomeTransactions
             .filter(tx => {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
@@ -1437,15 +1439,15 @@ userRouter.get('/dashboard/team-income', async (req, res) => {
             .reduce((sum, tx) => sum + Number(tx.amount), 0);
         
         return res.json({
-            totalTeamIncome,
-            todaysTeamIncome,
+            totalTeamIncome: totalReferralIncome, // Keep old name for frontend compatibility
+            todaysTeamIncome: todaysReferralIncome,
             levelBreakdown,
-            transactions: teamIncomeTransactions,
-            transactionCount: teamIncomeTransactions.length
+            transactions: referralIncomeTransactions,
+            transactionCount: referralIncomeTransactions.length
         });
     } catch (error) {
-        console.error('Team income error:', error);
-        return res.status(500).json({ error: 'Failed to load team income' });
+        console.error('Referral income error:', error);
+        return res.status(500).json({ error: 'Failed to load referral income' });
     }
 });
 

@@ -1,8 +1,21 @@
 import prisma from '../lib/prisma.js';
 
 /**
- * Calculates and distributes team income based on monthly income from deposits
- * Team income structure:
+ * ⚠️ DEPRECATED - DO NOT USE THIS SERVICE ⚠️
+ * 
+ * This service was calculating team income based on DOWNLINE DEPOSITS which is INCORRECT.
+ * 
+ * The correct logic is:
+ * - DIRECT INCOME: One-time 10% commission when someone uses your referral code (first deposit only)
+ * - REFERRAL INCOME: Portion of YOUR OWN monthly profit distributed to your uplines
+ *   (NOT from downline deposits or downline profits)
+ * 
+ * Use these services instead:
+ * - For Direct Income: See routes/investment.js (already implemented correctly)
+ * - For Referral Income: Use monthlyProfitDistribution.js or workers.js runMonthlyReferralIncome()
+ * 
+ * OLD INCORRECT LOGIC (DO NOT USE):
+ * - This was calculating team income based on downline deposits
  * - Level 1 (direct): 10% of monthly income
  * - Level 2: 5% of monthly income
  * - Level 3: 3% of monthly income

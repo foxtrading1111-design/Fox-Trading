@@ -26,12 +26,16 @@ export async function runMonthlyTradingBonus() {
 }
 
 export async function runMonthlyReferralIncome() {
+  // Referral Income = Distribution of user's OWN monthly profit to uplines
+  // NOT from downline deposits or profits
   const referralPercentages = [
-    12, // Level 1
-    8,  // Level 2
-    5, 5, 5, // Levels 3-5
-    3, 3, 3, 3, 3, // Levels 6-10
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1 // Levels 11-20
+    10, // Level 1
+    5,  // Level 2
+    3,  // Level 3
+    2,  // Level 4
+    1,  // Level 5
+    0.5, 0.5, 0.5, 0.5, 0.5, // Levels 6-10
+    0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 // Levels 11-20
   ];
   
   const startOfMonth = new Date();

@@ -7,31 +7,30 @@ import { getSponsorChain } from './teamIncome.js';
  * Logic:
  * 1. For each user with active deposits, calculate 10% monthly profit
  * 2. Add the profit to user's withdrawable balance
- * 3. Distribute percentages of this profit to team members up the chain
+ * 3. Distribute REFERRAL INCOME - portions of user's OWN profit to their uplines
  * 
- * Team Income Distribution from Monthly Profit:
- * - Level 1 (Direct): 10% of monthly profit
- * - Level 2: 5% of monthly profit
- * - Level 3: 3% of monthly profit
- * - Level 4: 2% of monthly profit
- * - Level 5: 1% of monthly profit
- * - Levels 6-20: 0.5% each of monthly profit
+ * REFERRAL INCOME Distribution (from user's OWN monthly profit):
+ * - Level 1: 10% of user's monthly profit
+ * - Level 2: 5% of user's monthly profit
+ * - Level 3: 3% of user's monthly profit
+ * - Level 4: 2% of user's monthly profit
+ * - Level 5: 1% of user's monthly profit
+ * - Levels 6-20: 0.5% each of user's monthly profit
  */
 
-const TEAM_INCOME_PERCENTAGES = {
-  1: 10,   // Level 1 (direct) - 10%
-  2: 5,    // Level 2 - 5%
-  3: 3,    // Level 3 - 3%
-  4: 2,    // Level 4 - 2%
-  5: 1,    // Level 5 - 1%
-  // Levels 6-20 get 0.5% each
-};
+const REFERRAL_PERCENTAGES = [
+  10, // Level 1
+  5,  // Level 2
+  3,  // Level 3
+  2,  // Level 4
+  1,  // Level 5
+  0.5, 0.5, 0.5, 0.5, 0.5, // Levels 6-10
+  0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 // Levels 11-20
+];
 
-function getTeamIncomePercentage(level) {
-  if (level <= 5) {
-    return TEAM_INCOME_PERCENTAGES[level] || 0;
-  } else if (level >= 6 && level <= 20) {
-    return 0.5; // 0.5% for levels 6-20
+function getReferralIncomePercentage(level) {
+  if (level >= 1 && level <= 20) {
+    return REFERRAL_PERCENTAGES[level - 1] || 0;
   }
   return 0; // No income beyond level 20
 }
@@ -97,43 +96,43 @@ async function distributeMonthlyProfit(userId) {
         }
       });
       
-      // Distribute team income from this user's monthly profit
+      // Distribute REFERRAL INCOME from this user's OWN monthly profit to uplines
       const sponsorChain = await getSponsorChain(userId);
-      const teamDistributions = [];
+      const referralDistributions = [];
       
       for (const sponsor of sponsorChain) {
-        const percentage = getTeamIncomePercentage(sponsor.level);
+        const percentage = getReferralIncomePercentage(sponsor.level);
         if (percentage === 0) continue;
         
-        const teamIncomeAmount = Number((monthlyProfit * percentage / 100).toFixed(2));
+        const referralIncomeAmount = Number((monthlyProfit * percentage / 100).toFixed(2));
         
-        if (teamIncomeAmount > 0) {
-          // Add team income to sponsor's withdrawable balance
+        if (referralIncomeAmount > 0) {
+          // Add referral income to sponsor's withdrawable balance
           await tx.wallets.upsert({
             where: { user_id: sponsor.userId },
-            create: { user_id: sponsor.userId, balance: teamIncomeAmount },
-            update: { balance: { increment: teamIncomeAmount } }
+            create: { user_id: sponsor.userId, balance: referralIncomeAmount },
+            update: { balance: { increment: referralIncomeAmount } }
           });
           
-          // Create team income transaction
+          // Create referral income transaction
           await tx.transactions.create({
             data: {
               user_id: sponsor.userId,
-              amount: teamIncomeAmount,
+              amount: referralIncomeAmount,
               type: 'credit',
-              income_source: 'team_income',
-              description: `Level ${sponsor.level} team income (${percentage}%) from ${user?.full_name || user?.email}'s monthly profit of $${monthlyProfit.toFixed(2)}`,
+              income_source: 'referral_income',
+              description: `Level ${sponsor.level} referral income (${percentage}%) from ${user?.full_name || user?.email}'s monthly profit of $${monthlyProfit.toFixed(2)}`,
               status: 'COMPLETED',
               referral_level: sponsor.level,
               monthly_income_source_user_id: userId
             }
           });
           
-          teamDistributions.push({
+          referralDistributions.push({
             sponsorId: sponsor.userId,
             level: sponsor.level,
             percentage: percentage,
-            amount: teamIncomeAmount,
+            amount: referralIncomeAmount,
             name: sponsor.name
           });
         }
@@ -143,8 +142,8 @@ async function distributeMonthlyProfit(userId) {
         success: true,
         userId: userId,
         monthlyProfit: monthlyProfit,
-        teamDistributions: teamDistributions,
-        totalTeamDistributed: teamDistributions.reduce((sum, d) => sum + d.amount, 0)
+        referralDistributions: referralDistributions,
+        totalReferralDistributed: referralDistributions.reduce((sum, d) => sum + d.amount, 0)
       };
     });
     
@@ -181,7 +180,7 @@ async function processMonthlyProfitDistribution() {
     const results = [];
     let totalProcessed = 0;
     let totalProfitDistributed = 0;
-    let totalTeamDistributed = 0;
+    let totalReferralDistributed = 0;
     
     for (const userGroup of usersWithDeposits) {
       const userId = userGroup.user_id;
@@ -190,7 +189,7 @@ async function processMonthlyProfitDistribution() {
       if (result.success) {
         totalProcessed++;
         totalProfitDistributed += result.monthlyProfit || 0;
-        totalTeamDistributed += result.totalTeamDistributed || 0;
+        totalReferralDistributed += result.totalReferralDistributed || 0;
         results.push(result);
       } else {
         console.error(`❌ Failed to process monthly profit for user ${userId}:`, result.error);
@@ -200,14 +199,14 @@ async function processMonthlyProfitDistribution() {
     console.log(`✅ Monthly profit distribution complete:`);
     console.log(`   - Users processed: ${totalProcessed}/${usersWithDeposits.length}`);
     console.log(`   - Total profit distributed: $${totalProfitDistributed.toFixed(2)}`);
-    console.log(`   - Total team income distributed: $${totalTeamDistributed.toFixed(2)}`);
+    console.log(`   - Total referral income distributed: $${totalReferralDistributed.toFixed(2)}`);
     
     return {
       success: true,
       usersProcessed: totalProcessed,
       totalUsers: usersWithDeposits.length,
       totalProfitDistributed: totalProfitDistributed,
-      totalTeamDistributed: totalTeamDistributed,
+      totalReferralDistributed: totalReferralDistributed,
       results: results
     };
     
