@@ -165,14 +165,15 @@ userRouter.get('/dashboard', async (req, res) => {
             }
         });
 
-        // Calculate today's investment profit
+        // Calculate expected daily investment profit (only from COMPLETED deposits)
         const investmentDeposits = await prisma.transactions.findMany({
             where: { 
                 user_id: userId,
                 OR: [
                     { type: 'DEPOSIT', status: 'COMPLETED' },
-                    { type: 'credit', income_source: { endsWith: '_deposit' } }
-                ]
+                    { type: 'credit', income_source: { endsWith: '_deposit' }, status: 'COMPLETED' }
+                ],
+                status: 'COMPLETED' // Ensure only completed deposits are counted
             },
             select: { amount: true, timestamp: true }
         });
@@ -405,8 +406,9 @@ userRouter.get('/investments/my', async (req, res) => {
                 user_id: userId,
                 OR: [
                     { type: 'DEPOSIT', status: 'COMPLETED' },
-                    { type: 'credit', income_source: { endsWith: '_deposit' } }
-                ]
+                    { type: 'credit', income_source: { endsWith: '_deposit' }, status: 'COMPLETED' }
+                ],
+                status: 'COMPLETED' // Only approved/completed deposits
             },
             select: {
                 id: true,
@@ -481,14 +483,15 @@ userRouter.get('/investments/team', async (req, res) => {
         // Get downline IDs
         const downlineIds = await getDownlineIds(directChildren.map(c => c.id));
         
-        // Get all team investments (completed deposits)
+        // Get all team investments (completed deposits only)
         const teamDeposits = await prisma.transactions.findMany({
             where: { 
                 user_id: { in: downlineIds },
                 OR: [
                     { type: 'DEPOSIT', status: 'COMPLETED' },
-                    { type: 'credit', income_source: { endsWith: '_deposit' } }
-                ]
+                    { type: 'credit', income_source: { endsWith: '_deposit' }, status: 'COMPLETED' }
+                ],
+                status: 'COMPLETED' // Only approved/completed deposits
             },
             include: {
                 users: {
