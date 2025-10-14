@@ -258,6 +258,23 @@ userRouter.get('/dashboard', async (req, res) => {
                 ]
             }
         });
+        
+        // Calculate total team investment profits (daily_profit, monthly_profit, trading_bonus)
+        // This includes ALL investment profits earned by downline members
+        const teamInvestmentProfitsAgg = await prisma.transactions.aggregate({
+            _sum: { amount: true },
+            where: {
+                user_id: { in: downlineIds },
+                type: 'credit',
+                income_source: { 
+                    in: ['daily_profit', 'monthly_profit', 'trading_bonus', 'investment_profit']
+                },
+                status: 'COMPLETED',
+                description: {
+                    not: { contains: '[OLD SYSTEM' } // Exclude old incorrect transactions
+                }
+            }
+        });
 
         // Daily income from transactions (includes daily_profit transactions created by cron)
         const dailyIncomeFromTransactions = Number(dailyIncomeAgg._sum.amount || 0);
@@ -286,6 +303,7 @@ userRouter.get('/dashboard', async (req, res) => {
             total_business: totalBusinessAgg._sum.amount ?? 0,
             direct_team: directChildren.length,
             total_team: downlineIds.length - 1, // Subtract 1 to not include user themselves
+            team_investment_profits: teamInvestmentProfitsAgg._sum.amount ?? 0, // Total investment profits of all team members
             
             // Income breakdown
             income_breakdown: incomeBreakdown.map(item => ({
