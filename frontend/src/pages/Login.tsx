@@ -57,6 +57,11 @@ export default function LoginPage() {
             <div>
               <label className="block mb-2">Password</label>
               <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" type="password" required />
+              <div className="mt-1 text-right">
+                <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
             </div>
             {error && <p className="text-destructive text-sm">{error}</p>}
             <button 
