@@ -110,11 +110,11 @@ export default function AppLayout() {
             </div>
             <div className="flex items-center gap-2">
               <Phone size={12} />
-              <span>+91 XXXXXXXXXX</span>
+              <span>{dashboardData?.phone || 'Not provided'}</span>
             </div>
             <div className="flex items-center gap-2">
               <MapPin size={12} />
-              <span>India</span>
+              <span>{dashboardData?.country || 'Not provided'}</span>
             </div>
             <div className="flex items-center gap-2">
               <Calendar size={12} />

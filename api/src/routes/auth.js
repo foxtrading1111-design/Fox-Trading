@@ -15,7 +15,9 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   sponsor_referral_code: z.string().min(4),
-  position: z.enum(['LEFT', 'RIGHT'])
+  position: z.enum(['LEFT', 'RIGHT']),
+  country: z.string().min(2).optional(),
+  phone: z.string().min(10).max(20).optional()
 });
 
 // Debug test endpoint
@@ -53,8 +55,8 @@ authRouter.post('/register/send-otp', async (req, res) => {
     console.log('Validation error:', parse.error.flatten());
     return res.status(400).json({ error: parse.error.flatten() });
   }
-  const { full_name, email, password, sponsor_referral_code, position } = parse.data;
-  console.log('Parsed data:', { full_name, email, sponsor_referral_code, position });
+  const { full_name, email, password, sponsor_referral_code, position, country, phone } = parse.data;
+  console.log('Parsed data:', { full_name, email, sponsor_referral_code, position, country, phone });
 
   try {
     console.log('Checking dependencies:', {
@@ -78,6 +80,8 @@ authRouter.post('/register/send-otp', async (req, res) => {
       password,
       sponsor_referral_code,
       position,
+      country,
+      phone,
       otp,
       createdAt: new Date(),
       expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
@@ -152,7 +156,7 @@ authRouter.post('/register/verify-otp', async (req, res) => {
     }
 
     // OTP verified - now create the user
-    const { full_name, password, sponsor_referral_code, position } = storedData;
+    const { full_name, password, sponsor_referral_code, position, country, phone } = storedData;
     
     // Double-check email isn't taken (race condition protection)
     const existing = await prisma.users.findUnique({ where: { email } });
@@ -180,6 +184,8 @@ authRouter.post('/register/verify-otp', async (req, res) => {
         referral_code: referralCode,
         sponsor_id: sponsor.id,
         position: position,
+        country: country || null,
+        phone: phone || null,
         wallets: { create: { balance: 0 } },
       },
     });

@@ -82,7 +82,7 @@ userRouter.get('/dashboard', async (req, res) => {
         // Get user profile info
         const user = await prisma.users.findUnique({
             where: { id: userId },
-            select: { full_name: true, email: true, referral_code: true, created_at: true }
+            select: { full_name: true, email: true, referral_code: true, created_at: true, country: true, phone: true }
         });
 
         // Get total deposited amount (for investment tracking)
@@ -250,6 +250,8 @@ userRouter.get('/dashboard', async (req, res) => {
             user_email: user?.email ?? 'N/A',
             referral_code: user?.referral_code ?? 'N/A',
             join_date: user?.created_at ?? null,
+            country: user?.country ?? null,
+            phone: user?.phone ?? null,
             
             // Financial data
             total_investment: depositedAmountAgg._sum.amount ?? 0, // Total deposited amount (for tracking)
@@ -287,7 +289,7 @@ userRouter.get('/profile', async (req, res) => {
     try {
         const user = await prisma.users.findUnique({
             where: { id: userId },
-            select: { full_name: true, email: true, referral_code: true, sponsor_id: true, created_at: true },
+            select: { full_name: true, email: true, referral_code: true, sponsor_id: true, created_at: true, country: true, phone: true },
         });
         
         if (!user) {
