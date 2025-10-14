@@ -41,7 +41,7 @@ const allowlist = isProduction
 // Simplified CORS configuration to ensure it works
 const corsOptions = {
   origin: function (origin, callback) {
-    console.log(`\n=== CORS DEBUG ===");
+    console.log(`\n=== CORS DEBUG ===`);
     console.log(`Request origin: ${origin}`);
     console.log(`Environment: ${process.env.NODE_ENV}`);
     console.log(`Is production: ${isProduction}`);
