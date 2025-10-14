@@ -67,21 +67,27 @@ async function main() {
       console.log('📝 Updating transaction descriptions to mark as old system...');
       
       // Mark all old team_income transactions with [OLD SYSTEM] tag
-      const updateResult = await prisma.transactions.updateMany({
-        where: {
-          income_source: 'team_income',
-          description: {
-            not: { contains: '[OLD SYSTEM]' }
-          }
-        },
-        data: {
-          description: {
-            set: prisma.raw(`CONCAT('[OLD SYSTEM - INCORRECT CALCULATION] ', description)`)
-          }
-        }
-      });
+      // We need to use raw SQL for this since Prisma doesn't support CONCAT in updateMany
+      const teamIncomeResult = await prisma.$executeRaw`
+        UPDATE "transactions"
+        SET description = CONCAT('[OLD SYSTEM - INCORRECT CALCULATION] ', description)
+        WHERE income_source = 'team_income'
+        AND description NOT LIKE '%[OLD SYSTEM]%'
+      `;
       
-      console.log(`✅ Updated ${updateResult.count} transaction descriptions`);
+      console.log(`✅ Updated ${teamIncomeResult} team_income transaction descriptions`);
+      
+      // Mark all referral_income transactions that came from DEPOSITS (not monthly profits)
+      // These have descriptions containing "deposit" which means they're wrong
+      const referralFromDepositsResult = await prisma.$executeRaw`
+        UPDATE "transactions"
+        SET description = CONCAT('[OLD SYSTEM - FROM DEPOSIT, NOT PROFIT] ', description)
+        WHERE income_source = 'referral_income'
+        AND description LIKE '%deposit%'
+        AND description NOT LIKE '%[OLD SYSTEM]%'
+      `;
+      
+      console.log(`✅ Updated ${referralFromDepositsResult} referral_income (from deposits) transaction descriptions`);
       
       // Note: We do NOT deduct these amounts from wallets
       // The admin should decide whether to:
@@ -92,6 +98,7 @@ async function main() {
       console.log('');
       console.log('⚠️  IMPORTANT NOTES:');
       console.log('   - Old team_income transactions have been marked but NOT removed');
+      console.log('   - Old referral_income from deposits have been marked but NOT removed');
       console.log('   - User wallet balances have NOT been adjusted');
       console.log('   - Admin should review and decide on balance adjustments');
       console.log('   - New referral_income calculations will use correct logic going forward');

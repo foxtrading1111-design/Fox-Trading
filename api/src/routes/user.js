@@ -1401,13 +1401,17 @@ userRouter.get('/dashboard/direct-income', async (req, res) => {
 userRouter.get('/dashboard/team-income', async (req, res) => {
     const userId = req.user.id;
     try {
-        // Get both old 'team_income' and new 'referral_income' for backward compatibility
+        // Get referral_income and team_income, but EXCLUDE old incorrect ones
+        // Old incorrect transactions have [OLD SYSTEM] in their description
         const referralIncomeTransactions = await prisma.transactions.findMany({
             where: {
                 user_id: userId,
                 type: 'credit',
                 income_source: { in: ['team_income', 'referral_income'] },
-                status: 'COMPLETED'
+                status: 'COMPLETED',
+                description: {
+                    not: { contains: '[OLD SYSTEM' } // Exclude both [OLD SYSTEM] and [OLD SYSTEM - FROM DEPOSIT]
+                }
             },
             orderBy: { timestamp: 'desc' }
         });
