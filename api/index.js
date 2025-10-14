@@ -28,21 +28,49 @@ const extraOrigins = (process.env.FRONTEND_EXTRA_ORIGINS || '')
   .map((s) => s.trim())
   .filter(Boolean);
 const allowlist = isProduction
-  ? [frontendUrl, process.env.RENDER_EXTERNAL_URL, 'https://fox-trading-frontend.onrender.com', ...extraOrigins].filter(Boolean)
+  ? [
+      frontendUrl, 
+      process.env.RENDER_EXTERNAL_URL, 
+      'https://fox-trading-frontend.onrender.com',
+      'https://www.thefoxtrading.com',
+      'https://thefoxtrading.com',
+      ...extraOrigins
+    ].filter(Boolean)
   : ['http://localhost:8080', 'http://localhost:3000'];
 
 const corsOptions = {
   credentials: true,
   origin: (origin, cb) => {
+    console.log(`CORS Request from origin: ${origin}`);
+    console.log(`Allowed origins:`, allowlist);
+    
     // Allow server-to-server or curl (no origin)
-    if (!isProduction || !origin) return cb(null, true);
-    if (allowlist.includes(origin)) return cb(null, true);
-    // Deny without throwing (avoid 500 on preflight).
+    if (!origin) {
+      console.log('No origin header - allowing (server-to-server)');
+      return cb(null, true);
+    }
+    
+    // In development, allow all origins
+    if (!isProduction) {
+      console.log('Development mode - allowing all origins');
+      return cb(null, true);
+    }
+    
+    // Check if origin is in allowlist
+    if (allowlist.includes(origin)) {
+      console.log(`Origin ${origin} is in allowlist - allowing`);
+      return cb(null, true);
+    }
+    
+    // Log denied origins for debugging
+    console.log(`Origin ${origin} not in allowlist - denying`);
     return cb(null, false);
   },
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
+  allowedHeaders: ['Content-Type','Authorization','X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'X-Kuma-Revision'],
   optionsSuccessStatus: 204,
+  maxAge: 86400 // 24 hours
 };
 app.use(cors(corsOptions));
 // Preflight
@@ -59,6 +87,18 @@ app.get('/api/health', (_req, res) => res.json({
   timestamp: new Date().toISOString(),
   environment: process.env.NODE_ENV || 'development'
 }));
+
+// Debug endpoint for CORS troubleshooting
+app.get('/api/cors-debug', (req, res) => {
+  res.json({
+    origin: req.headers.origin,
+    isProduction: process.env.NODE_ENV === 'production',
+    allowedOrigins: allowlist,
+    frontendUrl: frontendUrl,
+    headers: req.headers,
+    timestamp: new Date().toISOString()
+  });
+});
 
 app.use('/api/auth', authRouter);
 app.use('/api/user', userRouter);
