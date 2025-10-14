@@ -347,7 +347,14 @@ userRouter.get('/income-breakdown', async (req, res) => {
         const agg = await prisma.transactions.groupBy({
             by: ['income_source'],
             _sum: { amount: true },
-            where: { user_id: userId, type: 'credit', status: { not: 'PENDING' } },
+            where: { 
+                user_id: userId, 
+                type: 'credit', 
+                status: { not: 'PENDING' },
+                description: {
+                    not: { contains: '[OLD SYSTEM' } // Exclude old incorrect transactions
+                }
+            },
         });
         
         const result = agg.map(a => ({
@@ -364,12 +371,15 @@ userRouter.get('/income-breakdown', async (req, res) => {
 userRouter.get('/referral-income', async (req, res) => {
     const userId = req.user.id;
     try {
-        // Get all referral income transactions (including pending)
+        // Get all referral income transactions (exclude old incorrect ones)
         const referralTransactions = await prisma.transactions.findMany({
             where: { 
                 user_id: userId, 
                 type: 'credit',
-                income_source: 'referral_income'
+                income_source: 'referral_income',
+                description: {
+                    not: { contains: '[OLD SYSTEM' } // Exclude old incorrect transactions
+                }
             },
             orderBy: { timestamp: 'desc' },
         });
