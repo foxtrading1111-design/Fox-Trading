@@ -46,7 +46,7 @@ export function startDailyProfitCron(options = {}) {
     }
   }, {
     scheduled: true,
-    timezone: "America/New_York" // Adjust timezone as needed
+    timezone: "Asia/Kolkata" // Indian Standard Time (IST)
   });
   
   console.log('📅 Daily profit cron job scheduled (runs daily at midnight)');
