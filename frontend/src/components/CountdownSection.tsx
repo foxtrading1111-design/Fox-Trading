@@ -1,47 +1,45 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart } from 'lucide-react';
 
+// Helper to compute time left to a target date
+function getTimeLeft(target: Date) {
+  const now = new Date();
+  const diff = Math.max(0, target.getTime() - now.getTime());
+  const dayMs = 24 * 60 * 60 * 1000;
+  const hourMs = 60 * 60 * 1000;
+  const minuteMs = 60 * 1000;
+
+  const days = Math.floor(diff / dayMs);
+  const hours = Math.floor((diff % dayMs) / hourMs);
+  const minutes = Math.floor((diff % hourMs) / minuteMs);
+  const seconds = Math.floor((diff % minuteMs) / 1000);
+  return { days, hours, minutes, seconds };
+}
+
 const CountdownSection = () => {
-  // Initialize with 240 days and randomized smaller units
-  const [timeLeft, setTimeLeft] = useState(() => ({
-    days: 240,
-    hours: Math.floor(Math.random() * 24),
-    minutes: Math.floor(Math.random() * 60),
-    seconds: Math.floor(Math.random() * 60),
-  }));
+  // Configure countdown end via env: VITE_COUNTDOWN_END, e.g. "2026-03-31T00:00:00+05:30"
+  const targetDate = useMemo(() => {
+    const envValue = import.meta.env.VITE_COUNTDOWN_END as string | undefined;
+    if (envValue) {
+      const d = new Date(envValue);
+      if (!isNaN(d.getTime())) return d;
+    }
+    // Fallback: 240 days from first render
+    const fallback = new Date();
+    fallback.setDate(fallback.getDate() + 240);
+    // End of day in IST-ish sense not enforced; this is a generic fallback
+    return fallback;
+  }, []);
+
+  const [timeLeft, setTimeLeft] = useState(() => getTimeLeft(targetDate));
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        let { days, hours, minutes, seconds } = prev;
-
-        if (days === 0 && hours === 0 && minutes === 0 && seconds === 0) {
-          return prev; // stop at zero
-        }
-
-        if (seconds > 0) {
-          seconds--;
-        } else if (minutes > 0) {
-          seconds = 59;
-          minutes--;
-        } else if (hours > 0) {
-          seconds = 59;
-          minutes = 59;
-          hours--;
-        } else if (days > 0) {
-          seconds = 59;
-          minutes = 59;
-          hours = 23;
-          days--;
-        }
-
-        return { days, hours, minutes, seconds };
-      });
+      setTimeLeft(getTimeLeft(targetDate));
     }, 1000);
-
     return () => clearInterval(timer);
-  }, []);
+  }, [targetDate]);
 
   return (
     <section className="py-20 bg-gray-50 relative overflow-hidden">

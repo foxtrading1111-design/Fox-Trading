@@ -27,8 +27,8 @@ export function startDailyProfitCron(options = {}) {
       .catch(error => console.error('❌ Initial distribution error:', error));
   }
   
-  // Run every day at midnight
-  cron.schedule('0 0 * * *', async () => {
+  // Run every day at 12:01 AM IST
+  cron.schedule('1 0 * * *', async () => {
     console.log('🕐 Daily profit cron job triggered at:', new Date().toISOString());
     
     try {
