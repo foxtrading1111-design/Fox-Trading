@@ -132,11 +132,19 @@ userRouter.get('/dashboard', async (req, res) => {
         });
 
         // Daily income - only income earned today (exclude deposits)
-        // Use IST timezone (UTC+5:30)
-        const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-        const today = new Date(nowIST.getFullYear(), nowIST.getMonth(), nowIST.getDate());
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        // Use IST timezone (UTC+5:30) - IST is UTC+5:30 hours
+        const now = new Date();
+        // Convert to IST by adding 5.5 hours to UTC
+        const istOffset = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
+        const nowIST = new Date(now.getTime() + istOffset);
+        
+        // Get start of today in IST, then convert back to UTC for DB query
+        const todayIST = new Date(nowIST.getFullYear(), nowIST.getMonth(), nowIST.getDate());
+        const today = new Date(todayIST.getTime() - istOffset); // Convert back to UTC
+        
+        const tomorrowIST = new Date(todayIST);
+        tomorrowIST.setDate(tomorrowIST.getDate() + 1);
+        const tomorrow = new Date(tomorrowIST.getTime() - istOffset); // Convert back to UTC
         
         const dailyIncomeAgg = await prisma.transactions.aggregate({
             _sum: { amount: true },
