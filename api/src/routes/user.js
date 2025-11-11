@@ -132,8 +132,9 @@ userRouter.get('/dashboard', async (req, res) => {
         });
 
         // Daily income - only income earned today (exclude deposits)
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // Use IST timezone (UTC+5:30)
+        const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+        const today = new Date(nowIST.getFullYear(), nowIST.getMonth(), nowIST.getDate());
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
         
@@ -183,23 +184,19 @@ userRouter.get('/dashboard', async (req, res) => {
             }
         });
 
-        // Calculate expected daily investment profit (only from COMPLETED deposits)
-        const investmentDeposits = await prisma.transactions.findMany({
-            where: { 
+        // Get today's actual distributed daily profit from transactions
+        const todayDailyProfitAgg = await prisma.transactions.aggregate({
+            _sum: { amount: true },
+            where: {
                 user_id: userId,
-                OR: [
-                    { type: 'DEPOSIT', status: 'COMPLETED' },
-                    { type: 'credit', income_source: { endsWith: '_deposit' }, status: 'COMPLETED' }
-                ],
-                status: 'COMPLETED' // Ensure only completed deposits are counted
-            },
-            select: { amount: true, timestamp: true }
+                type: 'credit',
+                income_source: 'daily_profit',
+                timestamp: { gte: today, lt: tomorrow },
+                status: 'COMPLETED'
+            }
         });
         
-        const dailyProfitRate = 0.10 / 30; // 10% monthly / 30 days
-        const todayInvestmentProfit = investmentDeposits.reduce((total, deposit) => {
-            return total + (Number(deposit.amount) * dailyProfitRate);
-        }, 0);
+        const todayInvestmentProfit = Number(todayDailyProfitAgg._sum.amount || 0);
         
         // Get total investment profit earned (from actual transactions)
         const totalInvestmentProfit = await getTotalInvestmentProfit(userId);

@@ -44,9 +44,9 @@ async function calculateUserDailyProfit(userId) {
 async function distributeDailyProfit(userId) {
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // Check if profit was already distributed today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Check if profit was already distributed today (IST timezone)
+      const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      const today = new Date(nowIST.getFullYear(), nowIST.getMonth(), nowIST.getDate());
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
       
