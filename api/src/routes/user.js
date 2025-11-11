@@ -185,6 +185,9 @@ userRouter.get('/dashboard', async (req, res) => {
         });
 
         // Get today's actual distributed daily profit from transactions
+        // Using IST timezone boundaries calculated above (today and tomorrow)
+        console.log('🔍 Debug - Today range:', { today: today.toISOString(), tomorrow: tomorrow.toISOString() });
+        
         const todayDailyProfitAgg = await prisma.transactions.aggregate({
             _sum: { amount: true },
             where: {
@@ -195,6 +198,20 @@ userRouter.get('/dashboard', async (req, res) => {
                 status: 'COMPLETED'
             }
         });
+        
+        // Debug: Check if transactions exist
+        const todayDailyProfitTransactions = await prisma.transactions.findMany({
+            where: {
+                user_id: userId,
+                type: 'credit',
+                income_source: 'daily_profit',
+                status: 'COMPLETED'
+            },
+            orderBy: { timestamp: 'desc' },
+            take: 5,
+            select: { amount: true, timestamp: true, description: true }
+        });
+        console.log('🔍 Debug - Recent daily_profit transactions:', JSON.stringify(todayDailyProfitTransactions, null, 2));
         
         const todayInvestmentProfit = Number(todayDailyProfitAgg._sum.amount || 0);
         
