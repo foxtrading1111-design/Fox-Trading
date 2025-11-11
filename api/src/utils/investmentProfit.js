@@ -124,12 +124,14 @@ export async function calculateDailyInvestmentProfits() {
  */
 export async function getTotalInvestmentProfit(userId) {
     try {
+        // Updated to use 'daily_profit' which is the correct income_source used by the cron job
+        // Previously was 'investment_profit' which was from the old system
         const profitAgg = await prisma.transactions.aggregate({
             _sum: { amount: true },
             where: {
                 user_id: userId,
                 type: 'credit',
-                income_source: 'investment_profit',
+                income_source: 'daily_profit',
                 status: 'COMPLETED'
             }
         });
@@ -146,12 +148,14 @@ export async function getTotalInvestmentProfit(userId) {
  */
 export async function getInvestmentProfitForPeriod(userId, startDate, endDate) {
     try {
+        // Updated to use 'daily_profit' which is the correct income_source used by the cron job
+        // Previously was 'investment_profit' which was from the old system
         const profitAgg = await prisma.transactions.aggregate({
             _sum: { amount: true },
             where: {
                 user_id: userId,
                 type: 'credit',
-                income_source: 'investment_profit',
+                income_source: 'daily_profit',
                 status: 'COMPLETED',
                 timestamp: {
                     gte: startDate,
