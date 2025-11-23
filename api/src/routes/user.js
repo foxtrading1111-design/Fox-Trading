@@ -435,8 +435,12 @@ userRouter.get('/referral-income', async (req, res) => {
 
         // Group by level for breakdown
         const levelBreakdown = referralTransactions.reduce((acc, tx) => {
-            const levelMatch = tx.description?.match(/level\s*(\d+)|L(\d+)/i);
-            const level = levelMatch ? parseInt(levelMatch[1] || levelMatch[2]) : 1;
+            // Use referral_level field if available, otherwise parse from description
+            let level = tx.referral_level;
+            if (!level) {
+                const levelMatch = tx.description?.match(/level\s*(\d+)|L(\d+)/i);
+                level = levelMatch ? parseInt(levelMatch[1] || levelMatch[2]) : 1;
+            }
             
             if (!acc[level]) {
                 acc[level] = { completed: 0, pending: 0, count: 0 };
@@ -1474,7 +1478,10 @@ userRouter.get('/dashboard/level-income', async (req, res) => {
                 user_id: userId,
                 type: 'credit',
                 income_source: 'referral_income',
-                status: 'COMPLETED'
+                status: 'COMPLETED',
+                description: {
+                    not: { contains: '[OLD SYSTEM' } // Exclude old incorrect transactions
+                }
             },
             orderBy: { timestamp: 'desc' }
         });

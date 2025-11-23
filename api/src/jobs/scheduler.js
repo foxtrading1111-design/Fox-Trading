@@ -9,10 +9,10 @@ export function scheduleCommissionJobs() {
   const isDevelopment = process.env.NODE_ENV !== 'production';
   startDailyProfitCron({ runOnStartup: isDevelopment });
   
-  // Monthly referral income distribution - runs on the 1st of every month at 2:00 AM
-  // This distributes referral income based on previous month's actual daily profits
-  cron.schedule('0 2 1 * *', async () => {
-    console.log('🔄 Running monthly referral income distribution...');
+  // Monthly referral income distribution - runs DAILY at 2:00 AM
+  // Checks for deposits that have completed 30-day cycles and distributes referral income
+  cron.schedule('0 2 * * *', async () => {
+    console.log('🔄 Running monthly referral income distribution (checking 30-day cycles)...');
     await processMonthlyProfitDistribution();
     console.log('✅ Monthly referral income distribution completed.');
   });
@@ -26,6 +26,6 @@ export function scheduleCommissionJobs() {
   
   console.log('✅ Cron jobs scheduled:');
   console.log('   - Daily profit: Every day at midnight (0.333% per day)');
-  console.log('   - Monthly referral income: 1st of month at 2:00 AM (based on actual daily profits)');
+  console.log('   - Monthly referral income: Every day at 2:00 AM (checks 30-day cycles per deposit)');
   console.log('   - Monthly salary: 1st of month at 3:00 AM');
 }

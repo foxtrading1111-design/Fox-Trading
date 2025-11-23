@@ -26,7 +26,9 @@ async function calculateUserDailyProfit(userId) {
     where: {
       user_id: userId,
       type: 'credit',
-      income_source: 'investment_deposit',
+      income_source: { 
+        in: ['investment_deposit', 'BEP20_deposit', 'TRC20_deposit'] // Support all deposit types
+      },
       status: 'COMPLETED',
       unlock_date: { 
         not: null,
@@ -131,15 +133,21 @@ async function processDailyProfitDistribution() {
   try {
     console.log('🔄 Starting daily profit distribution...');
     
+    const now = new Date();
+    
     // Get all users with active deposits
     const usersWithDeposits = await prisma.transactions.groupBy({
       by: ['user_id'],
       where: {
-        OR: [
-          { type: 'DEPOSIT', status: 'COMPLETED' },
-          { type: 'credit', income_source: { endsWith: '_deposit' } }
-        ],
-        status: 'COMPLETED'
+        type: 'credit',
+        income_source: { 
+          in: ['investment_deposit', 'BEP20_deposit', 'TRC20_deposit'] // Support all deposit types
+        },
+        status: 'COMPLETED',
+        unlock_date: { 
+          not: null,
+          gt: now // Still locked
+        }
       },
       _sum: { amount: true }
     });

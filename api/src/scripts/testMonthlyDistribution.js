@@ -1,21 +1,47 @@
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Load environment variables
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+dotenv.config({ path: join(__dirname, '../../.env') });
+
+// Set DATABASE_URL if passed as command line argument
+if (process.argv[2]) {
+  process.env.DATABASE_URL = process.argv[2];
+}
+
+// Check if DATABASE_URL is set
+if (!process.env.DATABASE_URL) {
+  console.error('❌ DATABASE_URL environment variable is not set!');
+  console.error('\nUsage:');
+  console.error('  node src/scripts/testMonthlyDistribution.js');
+  console.error('  OR');
+  console.error('  node src/scripts/testMonthlyDistribution.js "postgresql://..."');
+  process.exit(1);
+}
+
 import prisma from '../lib/prisma.js';
-import { processMonthlyProfitDistribution, getEligibleUsersForDistribution, getPreviousMonthKey } from '../services/monthlyProfitDistribution.js';
+import { processMonthlyProfitDistribution, getEligibleDepositsForDistribution, calculateCycleNumber } from '../services/monthlyProfitDistribution.js';
 
 /**
- * Test script to manually trigger monthly referral income distribution
+ * Test script to manually trigger 30-day cycle referral income distribution
  * 
- * Usage: node src/scripts/testMonthlyDistribution.js
+ * Usage: 
+ *   node src/scripts/testMonthlyDistribution.js
+ *   OR
+ *   node src/scripts/testMonthlyDistribution.js "postgresql://user:pass@host/db"
  * 
  * This will:
- * 1. Find all users who earned daily profits in the previous month
- * 2. Calculate their ACTUAL monthly profit from daily profit transactions
+ * 1. Find all deposits that have completed 30-day cycles (30, 60, 90 days, etc.)
+ * 2. Calculate their 30-day profit (10% of deposit amount)
  * 3. Distribute referral income (10%, 5%, 3%, 2%, 1%, 0.5%...) to uplines
  * 
- * Example: User deposits $100 on Oct 10, then $100 more on Oct 20
- * - Oct 10-19: Daily profit = $0.333 × 10 days = $3.33
- * - Oct 20-31: Daily profit = $0.666 × 12 days = $7.99
- * - Total October profit = $11.32
- * - On Nov 1st: Uplines get referral income based on $11.32
+ * Example: User deposits $1,000 on Oct 10
+ * - On Nov 9 (30 days): Cycle 1 complete, distribute referral income on $100
+ * - On Dec 9 (60 days): Cycle 2 complete, distribute referral income on $100
+ * - And so on until unlock_date
  */
 
 async function testDistribution() {
@@ -24,31 +50,35 @@ async function testDistribution() {
   
   try {
     const now = new Date();
-    const previousMonthKey = getPreviousMonthKey();
     
-    console.log('\n📅 Checking for eligible users...');
-    console.log(`   Current date: ${now.toISOString()}`);
-    console.log(`   Processing month: ${previousMonthKey}\n`);
+    console.log('\n📅 Checking for eligible deposits...');
+    console.log(`   Current date: ${now.toISOString()}\n`);
     
-    // Use the service function to get eligible users
-    const eligibleUsers = await getEligibleUsersForDistribution();
+    // Use the service function to get eligible deposits
+    const eligibleDeposits = await getEligibleDepositsForDistribution();
     
-    console.log(`✅ Found ${eligibleUsers.length} users eligible for referral income distribution\n`);
+    console.log(`✅ Found ${eligibleDeposits.length} deposits eligible for 30-day cycle distribution\n`);
     
-    if (eligibleUsers.length === 0) {
-      console.log('⚠️  No users eligible for distribution.');
-      console.log('   Either no users earned daily profits last month, or all have been processed.\n');
+    if (eligibleDeposits.length === 0) {
+      console.log('⚠️  No deposits eligible for distribution.');
+      console.log('   No deposits have completed a 30-day cycle today.\n');
       return;
     }
     
-    // Show user details
-    console.log('📊 Eligible User Details:');
+    // Show deposit details
+    console.log('📊 Eligible Deposit Details:');
     console.log('-'.repeat(80));
-    eligibleUsers.forEach((userInfo, index) => {
-      console.log(`${index + 1}. User: ${userInfo.user.full_name}`);
-      console.log(`   User ID: ${userInfo.userId}`);
-      console.log(`   Total Monthly Profit (from daily): $${userInfo.totalMonthlyProfit.toFixed(2)}`);
-      console.log(`   Has Sponsor: ${userInfo.user.sponsor_id ? 'Yes' : 'No'}`);
+    eligibleDeposits.forEach((depositInfo, index) => {
+      const cycleNum = calculateCycleNumber(depositInfo.timestamp, now);
+      const daysSince = Math.floor((now - new Date(depositInfo.timestamp)) / (1000 * 60 * 60 * 24));
+      console.log(`${index + 1}. User: ${depositInfo.users.full_name}`);
+      console.log(`   Deposit ID: ${depositInfo.id}`);
+      console.log(`   Amount: $${Number(depositInfo.amount).toFixed(2)}`);
+      console.log(`   Deposit Date: ${new Date(depositInfo.timestamp).toISOString()}`);
+      console.log(`   Days Since Deposit: ${daysSince}`);
+      console.log(`   Cycle Number: ${cycleNum}`);
+      console.log(`   30-Day Profit: $${depositInfo.monthlyProfit.toFixed(2)}`);
+      console.log(`   Has Sponsor: ${depositInfo.users.sponsor_id ? 'Yes' : 'No'}`);
       console.log('');
     });
     
@@ -66,8 +96,8 @@ async function testDistribution() {
       console.log('\n✅ Distribution completed successfully!\n');
       console.log('📈 Summary:');
       console.log('-'.repeat(80));
-      console.log(`   Users processed: ${result.usersProcessed}/${result.totalUsers}`);
-      console.log(`   Total monthly profit (from daily): $${result.totalProfitDistributed.toFixed(2)}`);
+      console.log(`   Deposits processed: ${result.depositsProcessed}/${result.totalDeposits}`);
+      console.log(`   Total 30-day profit: $${result.totalProfitDistributed.toFixed(2)}`);
       console.log(`   Total referral income: $${result.totalReferralDistributed.toFixed(2)}`);
       console.log('');
       
@@ -76,15 +106,16 @@ async function testDistribution() {
         console.log('\n📋 Detailed Results:');
         console.log('-'.repeat(80));
         
-        result.results.forEach((userResult, index) => {
-          if (userResult.monthlyProfit > 0) {
-            console.log(`\n${index + 1}. User ID: ${userResult.userId}`);
-            console.log(`   Month: ${userResult.monthKey}`);
-            console.log(`   Monthly Profit (from daily): $${userResult.monthlyProfit.toFixed(2)}`);
-            console.log(`   Referral Distributions: ${userResult.referralDistributions.length} levels`);
+        result.results.forEach((depositResult, index) => {
+          if (depositResult.monthlyProfit > 0) {
+            console.log(`\n${index + 1}. Deposit ID: ${depositResult.depositId}`);
+            console.log(`   User ID: ${depositResult.userId}`);
+            console.log(`   Cycle: ${depositResult.cycleNumber}`);
+            console.log(`   30-Day Profit: $${depositResult.monthlyProfit.toFixed(2)}`);
+            console.log(`   Referral Distributions: ${depositResult.referralDistributions.length} levels`);
             
-            if (userResult.referralDistributions.length > 0) {
-              userResult.referralDistributions.forEach(dist => {
+            if (depositResult.referralDistributions.length > 0) {
+              depositResult.referralDistributions.forEach(dist => {
                 console.log(`      Level ${dist.level}: $${dist.amount.toFixed(2)} (${dist.percentage}%) → ${dist.name || 'Unknown'}`);
               });
             }
