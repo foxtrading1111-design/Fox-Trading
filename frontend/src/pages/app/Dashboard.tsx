@@ -190,7 +190,7 @@ const Dashboard: React.FC = () => {
       <Card className="border-yellow-500/20">
         <CardHeader className="pb-3 sm:pb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-            <CardTitle className="text-lg sm:text-xl">Total Balance</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">My Investment</CardTitle>
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
@@ -277,12 +277,12 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Team Income */}
+        {/* Level Income */}
         <Card className="border-cyan-500/20">
           <CardHeader className="pb-2 sm:pb-3">
             <CardTitle className="text-xs sm:text-sm flex items-center gap-2">
               <Users size={14} className="text-cyan-500 sm:w-4 sm:h-4" />
-              Team Income
+              Level Income
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">

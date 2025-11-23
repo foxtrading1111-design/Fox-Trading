@@ -95,13 +95,6 @@ export default function AppLayout() {
                 ID: {dashboardData?.referral_code || 'N/A'}
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 hover:bg-yellow-500/10"
-            >
-              <Edit2 size={14} className="text-yellow-500" />
-            </Button>
           </div>
           <div className="space-y-1 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
@@ -121,13 +114,6 @@ export default function AppLayout() {
               <span>Joined: {dashboardData?.join_date ? new Date(dashboardData.join_date).toLocaleDateString() : 'N/A'}</span>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full mt-3 text-xs hover:bg-yellow-500/10 hover:border-yellow-500/50"
-          >
-            Update Details
-          </Button>
         </div>
 
         <nav className="flex flex-col gap-1">
