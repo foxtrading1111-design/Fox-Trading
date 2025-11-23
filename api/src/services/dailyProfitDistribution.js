@@ -16,19 +16,24 @@ const DAILY_PROFIT_RATE = MONTHLY_PROFIT_RATE / DAYS_IN_MONTH; // ~0.00333 per d
 
 /**
  * Calculate daily profit for a specific user
+ * Includes ALL active deposits (locked investments)
  */
 async function calculateUserDailyProfit(userId) {
-  // Get all user's active deposits (locked investments)
+  const now = new Date();
+  
+  // Get all user's active deposits that are still locked
   const deposits = await prisma.transactions.findMany({
     where: {
       user_id: userId,
-      OR: [
-        { type: 'DEPOSIT', status: 'COMPLETED' },
-        { type: 'credit', income_source: { endsWith: '_deposit' } }
-      ],
-      status: 'COMPLETED'
+      type: 'credit',
+      income_source: 'investment_deposit',
+      status: 'COMPLETED',
+      unlock_date: { 
+        not: null,
+        gt: now // Still locked
+      }
     },
-    select: { amount: true, timestamp: true }
+    select: { amount: true, timestamp: true, unlock_date: true }
   });
   
   // Calculate total deposit amount
@@ -79,6 +84,13 @@ async function distributeDailyProfit(userId) {
       const user = await tx.users.findUnique({
         where: { id: userId },
         select: { full_name: true, email: true }
+      });
+      
+      // Add daily profit to user's wallet balance
+      await tx.wallets.upsert({
+        where: { user_id: userId },
+        create: { user_id: userId, balance: dailyProfit },
+        update: { balance: { increment: dailyProfit } }
       });
       
       // Create daily profit transaction

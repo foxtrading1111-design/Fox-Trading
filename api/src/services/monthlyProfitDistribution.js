@@ -5,17 +5,23 @@ import { getSponsorChain } from './teamIncome.js';
  * Monthly Investment Profit Distribution Service
  * 
  * Logic:
- * 1. For each user with active deposits, calculate 10% monthly profit
- * 2. Add the profit to user's withdrawable balance
- * 3. Distribute REFERRAL INCOME - portions of user's OWN profit to their uplines
+ * 1. Calculate ACTUAL daily profits earned by user in the past month
+ * 2. Distribute REFERRAL INCOME based on actual profits to uplines
+ * 3. Track monthly distributions to avoid duplicates
  * 
- * REFERRAL INCOME Distribution (from user's OWN monthly profit):
+ * REFERRAL INCOME Distribution (from user's ACTUAL monthly profit):
  * - Level 1: 10% of user's monthly profit
  * - Level 2: 5% of user's monthly profit
  * - Level 3: 3% of user's monthly profit
  * - Level 4: 2% of user's monthly profit
  * - Level 5: 1% of user's monthly profit
  * - Levels 6-20: 0.5% each of user's monthly profit
+ * 
+ * Example: User deposits $100 on Oct 10, then $100 more on Oct 20
+ * - Oct 10-19: Daily profit = $0.333 (from $100) × 10 days = $3.33
+ * - Oct 20-Nov 9: Daily profit = $0.666 (from $200) × 21 days = $13.99
+ * - Total monthly profit = $17.32
+ * - On Nov 10th: Uplines get referral income based on $17.32
  */
 
 const REFERRAL_PERCENTAGES = [
@@ -36,65 +42,142 @@ function getReferralIncomePercentage(level) {
 }
 
 /**
- * Calculate monthly profit for a specific user
+ * Get the current month-year key for tracking
  */
-async function calculateUserMonthlyProfit(userId) {
-  // Get all user's active deposits (locked investments)
-  const deposits = await prisma.transactions.findMany({
-    where: {
-      user_id: userId,
-      type: 'credit',
-      income_source: 'investment_deposit',
-      status: 'COMPLETED',
-      unlock_date: { not: null }
-    },
-    select: { amount: true, timestamp: true }
-  });
-  
-  // Calculate total deposit amount
-  const totalDeposits = deposits.reduce((sum, deposit) => sum + Number(deposit.amount), 0);
-  
-  // Monthly profit is 10% of total deposits
-  return totalDeposits * 0.10; // 10% monthly profit
+function getCurrentMonthKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
 /**
- * Distribute monthly profit to user and team
+ * Get the previous month-year key
  */
-async function distributeMonthlyProfit(userId) {
+function getPreviousMonthKey() {
+  const now = new Date();
+  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Calculate actual monthly profit for a user based on daily profits earned
+ * This looks at the previous month's daily_profit transactions
+ */
+async function calculateActualMonthlyProfit(userId) {
+  const now = new Date();
+  const firstDayOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const firstDayOfPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  
+  // Get all daily profit transactions from the previous month
+  const dailyProfits = await prisma.transactions.findMany({
+    where: {
+      user_id: userId,
+      income_source: 'daily_profit',
+      status: 'COMPLETED',
+      timestamp: {
+        gte: firstDayOfPreviousMonth,
+        lt: firstDayOfCurrentMonth
+      }
+    },
+    select: {
+      amount: true,
+      timestamp: true
+    }
+  });
+  
+  // Sum up all daily profits
+  const totalMonthlyProfit = dailyProfits.reduce((sum, profit) => sum + Number(profit.amount), 0);
+  
+  return {
+    totalProfit: Number(totalMonthlyProfit.toFixed(2)),
+    dailyProfitsCount: dailyProfits.length,
+    monthKey: getPreviousMonthKey()
+  };
+}
+
+/**
+ * Get users eligible for monthly referral income distribution
+ * A user is eligible if:
+ * 1. They earned daily profits in the previous month
+ * 2. Referral income hasn't been distributed for that month yet
+ */
+async function getEligibleUsersForDistribution() {
+  const now = new Date();
+  const firstDayOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const firstDayOfPreviousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const previousMonthKey = getPreviousMonthKey();
+  
+  // Get all users who earned daily profits in the previous month
+  const usersWithProfits = await prisma.transactions.groupBy({
+    by: ['user_id'],
+    where: {
+      income_source: 'daily_profit',
+      status: 'COMPLETED',
+      timestamp: {
+        gte: firstDayOfPreviousMonth,
+        lt: firstDayOfCurrentMonth
+      }
+    },
+    _sum: {
+      amount: true
+    }
+  });
+  
+  const eligibleUsers = [];
+  
+  for (const userGroup of usersWithProfits) {
+    const userId = userGroup.user_id;
+    
+    // Check if referral income has already been distributed for this month
+    const existingDistribution = await prisma.transactions.findFirst({
+      where: {
+        monthly_income_source_user_id: userId,
+        income_source: 'referral_income',
+        description: {
+          contains: `month ${previousMonthKey}`
+        }
+      }
+    });
+    
+    if (!existingDistribution) {
+      const user = await prisma.users.findUnique({
+        where: { id: userId },
+        select: {
+          full_name: true,
+          email: true,
+          sponsor_id: true
+        }
+      });
+      
+      eligibleUsers.push({
+        userId: userId,
+        user: user,
+        totalMonthlyProfit: Number(userGroup._sum.amount)
+      });
+    }
+  }
+  
+  return eligibleUsers;
+}
+
+/**
+ * Distribute referral income for a user's monthly profit to their uplines
+ */
+async function distributeMonthlyReferralIncome(userInfo) {
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // Calculate user's monthly profit
-      const monthlyProfit = await calculateUserMonthlyProfit(userId);
+      const userId = userInfo.userId;
+      const monthlyProfit = userInfo.totalMonthlyProfit;
+      const monthKey = getPreviousMonthKey();
       
       if (monthlyProfit <= 0) {
-        return { success: true, message: 'No profit to distribute', monthlyProfit: 0, teamDistributions: [] };
+        return { success: true, message: 'No profit to distribute', monthlyProfit: 0, referralDistributions: [] };
       }
       
       // Get user info
-      const user = await tx.users.findUnique({
-        where: { id: userId },
-        select: { full_name: true, email: true }
-      });
+      const user = userInfo.user;
       
-      // Add monthly profit to user's withdrawable balance
-      await tx.wallets.upsert({
-        where: { user_id: userId },
-        create: { user_id: userId, balance: monthlyProfit },
-        update: { balance: { increment: monthlyProfit } }
-      });
-      
-      // Create monthly profit transaction for user
-      await tx.transactions.create({
-        data: {
-          user_id: userId,
-          amount: monthlyProfit,
-          type: 'credit',
-          income_source: 'monthly_profit',
-          description: `Monthly investment profit (10%) - $${monthlyProfit.toFixed(2)}`,
-          status: 'COMPLETED'
-        }
-      });
+      // Note: Monthly profit is already added to wallet via daily profits
+      // We only distribute referral income here
       
       // Distribute REFERRAL INCOME from this user's OWN monthly profit to uplines
       const sponsorChain = await getSponsorChain(userId);
@@ -121,7 +204,7 @@ async function distributeMonthlyProfit(userId) {
               amount: referralIncomeAmount,
               type: 'credit',
               income_source: 'referral_income',
-              description: `Level ${sponsor.level} referral income (${percentage}%) from ${user?.full_name || user?.email}'s monthly profit of $${monthlyProfit.toFixed(2)}`,
+              description: `Level ${sponsor.level} referral income (${percentage}%) from ${user?.full_name || user?.email}'s month ${monthKey} profit of $${monthlyProfit.toFixed(2)}`,
               status: 'COMPLETED',
               referral_level: sponsor.level,
               monthly_income_source_user_id: userId
@@ -141,6 +224,7 @@ async function distributeMonthlyProfit(userId) {
       return {
         success: true,
         userId: userId,
+        monthKey: monthKey,
         monthlyProfit: monthlyProfit,
         referralDistributions: referralDistributions,
         totalReferralDistributed: referralDistributions.reduce((sum, d) => sum + d.amount, 0)
@@ -150,61 +234,74 @@ async function distributeMonthlyProfit(userId) {
     return result;
     
   } catch (error) {
-    console.error('Error distributing monthly profit:', error);
-    return { success: false, error: error.message };
+    console.error('Error distributing monthly profit for deposit:', error);
+    return { success: false, error: error.message, userId: userInfo.userId };
   }
 }
 
 /**
- * Process monthly profit distribution for all users with active deposits
- * This should be called monthly via a cron job
+ * Process monthly referral income distribution for all eligible users
+ * This should be called monthly (e.g., on the 1st of each month)
+ * 
+ * It will:
+ * 1. Find all users who earned daily profits in the previous month
+ * 2. Calculate their total monthly profit from daily profits
+ * 3. Distribute referral income to their uplines
  */
 async function processMonthlyProfitDistribution() {
   try {
-    console.log('🔄 Starting monthly profit distribution...');
+    const previousMonthKey = getPreviousMonthKey();
+    console.log('🔄 Starting monthly referral income distribution...');
+    console.log(`📅 Processing month: ${previousMonthKey}`);
+    console.log(`📅 Current date: ${new Date().toISOString()}\n`);
     
-    // Get all users with active deposits
-    const usersWithDeposits = await prisma.transactions.groupBy({
-      by: ['user_id'],
-      where: {
-        type: 'credit',
-        income_source: 'investment_deposit',
-        status: 'COMPLETED',
-        unlock_date: { not: null }
-      },
-      _sum: { amount: true }
-    });
+    // Get all eligible users
+    const eligibleUsers = await getEligibleUsersForDistribution();
     
-    console.log(`📊 Found ${usersWithDeposits.length} users with active deposits`);
+    console.log(`📊 Found ${eligibleUsers.length} users eligible for referral income distribution\n`);
+    
+    if (eligibleUsers.length === 0) {
+      console.log('✅ No users eligible for distribution at this time.');
+      return {
+        success: true,
+        usersProcessed: 0,
+        totalUsers: 0,
+        totalProfitDistributed: 0,
+        totalReferralDistributed: 0,
+        results: []
+      };
+    }
     
     const results = [];
     let totalProcessed = 0;
     let totalProfitDistributed = 0;
     let totalReferralDistributed = 0;
     
-    for (const userGroup of usersWithDeposits) {
-      const userId = userGroup.user_id;
-      const result = await distributeMonthlyProfit(userId);
+    for (const userInfo of eligibleUsers) {
+      console.log(`Processing user ${userInfo.user.full_name} (Monthly profit: $${userInfo.totalMonthlyProfit.toFixed(2)})...`);
+      
+      const result = await distributeMonthlyReferralIncome(userInfo);
       
       if (result.success) {
         totalProcessed++;
         totalProfitDistributed += result.monthlyProfit || 0;
         totalReferralDistributed += result.totalReferralDistributed || 0;
         results.push(result);
+        console.log(`  ✅ Distributed $${result.totalReferralDistributed.toFixed(2)} referral income to uplines`);
       } else {
-        console.error(`❌ Failed to process monthly profit for user ${userId}:`, result.error);
+        console.error(`  ❌ Failed to process user ${userInfo.userId}:`, result.error);
       }
     }
     
-    console.log(`✅ Monthly profit distribution complete:`);
-    console.log(`   - Users processed: ${totalProcessed}/${usersWithDeposits.length}`);
-    console.log(`   - Total profit distributed: $${totalProfitDistributed.toFixed(2)}`);
+    console.log(`\n✅ Monthly referral income distribution complete:`);
+    console.log(`   - Users processed: ${totalProcessed}/${eligibleUsers.length}`);
+    console.log(`   - Total monthly profit (from daily): $${totalProfitDistributed.toFixed(2)}`);
     console.log(`   - Total referral income distributed: $${totalReferralDistributed.toFixed(2)}`);
     
     return {
       success: true,
       usersProcessed: totalProcessed,
-      totalUsers: usersWithDeposits.length,
+      totalUsers: eligibleUsers.length,
       totalProfitDistributed: totalProfitDistributed,
       totalReferralDistributed: totalReferralDistributed,
       results: results
@@ -217,7 +314,10 @@ async function processMonthlyProfitDistribution() {
 }
 
 export {
-  distributeMonthlyProfit,
+  distributeMonthlyReferralIncome,
   processMonthlyProfitDistribution,
-  calculateUserMonthlyProfit
+  getEligibleUsersForDistribution,
+  calculateActualMonthlyProfit,
+  getCurrentMonthKey,
+  getPreviousMonthKey
 };
