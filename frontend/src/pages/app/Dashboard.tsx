@@ -226,7 +226,7 @@ const Dashboard: React.FC = () => {
       <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-yellow-500/5">
         <CardHeader className="pb-3">
           <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-            <TrendingUp size={18} className="text-amber-500" />
+            <BarChart3 size={18} className="text-amber-500" />
             Daily Investment Profit
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-1">0.333% per day (10% monthly)</p>
@@ -235,8 +235,8 @@ const Dashboard: React.FC = () => {
           <div className="text-3xl sm:text-4xl font-bold text-amber-500 mb-2">
             ${userStats.todayInvestmentProfit.toFixed(2)}
           </div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Total Earned: ${userStats.totalInvestmentProfit.toFixed(2)}</span>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-yellow-500">Total Earned: ${userStats.totalInvestmentProfit.toFixed(2)}</span>
             <Badge variant="outline" className="border-amber-500/50 text-amber-500">Auto-credited</Badge>
           </div>
         </CardContent>
