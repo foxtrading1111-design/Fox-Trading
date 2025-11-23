@@ -38,9 +38,9 @@ const Dashboard: React.FC = () => {
     enabled: !!data
   });
   
-  const { data: teamIncomeData } = useQuery({ 
-    queryKey: ['team-income'], 
-    queryFn: () => api('/api/user/dashboard/team-income'),
+  const { data: levelIncomeData } = useQuery({ 
+    queryKey: ['level-income'], 
+    queryFn: () => api('/api/user/dashboard/level-income'),
     enabled: !!data
   });
   
@@ -106,9 +106,12 @@ const Dashboard: React.FC = () => {
     totalTeam: data.total_team,
     // New income data
     directIncome: Number(directIncomeData?.totalDirectIncome || 0),
-    teamIncome: Number(teamIncomeData?.totalTeamIncome || 0),
+    levelIncome: Number(levelIncomeData?.totalLevelIncome || 0),
     todayWithdrawal: Number(todayWithdrawalData?.totalTodayWithdrawal || 0)
   };
+
+  // Calculate corrected total income including level income
+  const correctedTotalIncome = userStats.totalIncome + userStats.levelIncome;
 
   const copyToClipboard = (text: string, itemName: string) => {
     navigator.clipboard.writeText(text);
@@ -287,10 +290,10 @@ const Dashboard: React.FC = () => {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="text-lg sm:text-xl lg:text-2xl font-bold text-cyan-500">
-              ${userStats.teamIncome?.toLocaleString() || '0'}
+              ${userStats.levelIncome?.toLocaleString() || '0'}
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              Multi-level earnings
+              Monthly referral earnings
             </div>
           </CardContent>
         </Card>
@@ -305,7 +308,7 @@ const Dashboard: React.FC = () => {
           </CardHeader>
           <CardContent className="pt-0">
             <div className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-500">
-              ${userStats.totalIncome.toLocaleString()}
+              ${correctedTotalIncome.toLocaleString()}
             </div>
           </CardContent>
         </Card>

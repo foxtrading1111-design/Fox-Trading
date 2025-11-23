@@ -1464,6 +1464,58 @@ userRouter.get('/dashboard/direct-income', async (req, res) => {
     }
 });
 
+// Level Income Tab - Referral income from monthly profit distributions
+// This shows referral income YOU earned from your downline's monthly profits
+userRouter.get('/dashboard/level-income', async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const referralIncomeTransactions = await prisma.transactions.findMany({
+            where: {
+                user_id: userId,
+                type: 'credit',
+                income_source: 'referral_income',
+                status: 'COMPLETED'
+            },
+            orderBy: { timestamp: 'desc' }
+        });
+        
+        const totalLevelIncome = referralIncomeTransactions.reduce(
+            (sum, tx) => sum + Number(tx.amount), 0
+        );
+        
+        const todaysLevelIncome = referralIncomeTransactions
+            .filter(tx => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                return tx.timestamp >= today && tx.timestamp < tomorrow;
+            })
+            .reduce((sum, tx) => sum + Number(tx.amount), 0);
+        
+        // Group by level
+        const incomeByLevel = {};
+        referralIncomeTransactions.forEach(tx => {
+            const level = tx.referral_level || 0;
+            if (!incomeByLevel[level]) {
+                incomeByLevel[level] = 0;
+            }
+            incomeByLevel[level] += Number(tx.amount);
+        });
+        
+        return res.json({
+            totalLevelIncome,
+            todaysLevelIncome,
+            incomeByLevel,
+            transactions: referralIncomeTransactions,
+            transactionCount: referralIncomeTransactions.length
+        });
+    } catch (error) {
+        console.error('Level income error:', error);
+        return res.status(500).json({ error: 'Failed to load level income' });
+    }
+});
+
 // Team Income Tab - Total investment profits earned by your entire team
 // This shows how much YOUR TEAM has earned (not what you get from them)
 userRouter.get('/dashboard/team-income', async (req, res) => {
