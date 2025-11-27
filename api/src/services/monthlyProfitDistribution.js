@@ -91,13 +91,15 @@ async function getPendingCycles(depositId, userId, depositDate, currentDate = ne
   if (completedCycles < 1) return [];
   
   // Check which cycles have already been distributed
+  // We check if ANY referral income transaction exists for this deposit+cycle combination
+  // (referral income goes TO uplines, so we check monthly_income_source_user_id)
   const pendingCycles = [];
   
   for (let cycle = 1; cycle <= completedCycles; cycle++) {
     const existingDistribution = await prisma.transactions.findFirst({
       where: {
-        user_id: userId,
         income_source: 'referral_income',
+        monthly_income_source_user_id: userId, // The deposit owner
         description: {
           contains: `Cycle ${cycle} from deposit ${depositId}`
         }
