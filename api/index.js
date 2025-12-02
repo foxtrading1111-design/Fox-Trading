@@ -34,6 +34,8 @@ const allowlist = isProduction
       'https://fox-trading-frontend.onrender.com',
       'https://www.thefoxtrading.com',
       'https://thefoxtrading.com',
+      'https://foxtradingai.com',
+      'https://www.foxtradingai.com',
       ...extraOrigins
     ].filter(Boolean)
   : ['http://localhost:8080', 'http://localhost:3000'];
